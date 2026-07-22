@@ -7,6 +7,54 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Running with Docker
+
+This project ships with a production-capable Docker setup: PHP-FPM + Nginx, MySQL,
+Redis, a queue worker, and a scheduler.
+
+```bash
+# Build images and start the whole stack
+docker compose up -d --build
+
+# The app is now available at:
+#   http://localhost:8000
+```
+
+On first boot the `app` container automatically seeds `.env` (from `.env.example`),
+runs database migrations, links storage, and — in production — caches config/routes/views.
+
+### Services
+
+| Service     | Purpose                                   | Port (host) |
+|-------------|-------------------------------------------|-------------|
+| `web`       | Nginx, serves the app                     | `8000`      |
+| `app`       | PHP-FPM (Laravel)                         | —           |
+| `queue`     | `queue:work` worker (runs scraping jobs)  | —           |
+| `scheduler` | Runs `schedule:run` every minute          | —           |
+| `mysql`     | MySQL 8.4 database                        | `3306`      |
+| `redis`     | Cache, sessions, and queue backend        | `6379`      |
+
+### Configuration
+
+Shared container configuration lives in **`.env.docker`** (loaded by the app, queue,
+and scheduler services). Host-side ports and DB credentials can be overridden via a
+root `.env` used by Compose (`APP_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`,
+`DB_ROOT_PASSWORD`, `DB_PORT`, `REDIS_PORT`).
+
+> **Before deploying:** change `APP_KEY` and all passwords in `.env.docker`, and set
+> `APP_ENV=production` / `APP_DEBUG=false`.
+
+### Common commands
+
+```bash
+docker compose logs -f app          # tail application logs
+docker compose exec app php artisan migrate
+docker compose exec app php artisan tinker
+docker compose exec app composer install
+docker compose down                 # stop the stack
+docker compose down -v              # stop and wipe data volumes
+```
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
