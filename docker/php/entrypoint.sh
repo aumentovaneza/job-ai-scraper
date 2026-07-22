@@ -18,9 +18,9 @@ fi
 
 # Wait for the database to accept connections (best-effort)
 if [ "${DB_CONNECTION:-}" != "sqlite" ] && [ -n "${DB_HOST:-}" ]; then
-    echo "Waiting for database at ${DB_HOST}:${DB_PORT:-3306}..."
+    echo "Waiting for database at ${DB_HOST}:${DB_PORT:-5432}..."
     for i in $(seq 1 30); do
-        if php -r "exit(@fsockopen(getenv('DB_HOST'), (int)(getenv('DB_PORT') ?: 3306)) ? 0 : 1);"; then
+        if php -r "exit(@fsockopen(getenv('DB_HOST'), (int)(getenv('DB_PORT') ?: 5432)) ? 0 : 1);"; then
             echo "Database is up."
             break
         fi
