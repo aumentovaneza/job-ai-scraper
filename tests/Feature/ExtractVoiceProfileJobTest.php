@@ -45,6 +45,7 @@ class ExtractVoiceProfileJobTest extends TestCase
         $this->assertDatabaseHas('ai_calls', [
             'user_id' => $user->id,
             'purpose' => 'voice_profile',
+            'prompt_version' => 'extract_voice_profile.v1',
             'reference_type' => Profile::class,
             'reference_id' => $profile->id,
             'status' => 'ok',

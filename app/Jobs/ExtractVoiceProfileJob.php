@@ -54,6 +54,7 @@ class ExtractVoiceProfileJob implements ShouldQueue
                 purpose: 'voice_profile',
                 referenceType: Profile::class,
                 referenceId: $profile->id,
+                promptVersion: self::PROMPT_VERSION,
             );
         } catch (AiBudgetExceededException|AnthropicException $e) {
             // Ledger already records the failure; surface breakage in logs and stop.

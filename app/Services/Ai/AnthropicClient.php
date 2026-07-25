@@ -38,12 +38,16 @@ class AnthropicClient
      * @param  array  $payload  Messages API body (messages, max_tokens, …). `model`
      *                          defaults to services.anthropic.model when absent.
      * @param  string  $purpose  ai_calls.purpose tag (e.g. 'voice_profile').
+     * @param  string|null  $promptVersion  Versioned prompt name recorded on the
+     *                                      ai_calls row so output stays reproducible
+     *                                      (e.g. 'enrich_job.v1'). See Prompt.
      */
     public function messages(
         array $payload,
         string $purpose,
         ?string $referenceType = null,
         ?int $referenceId = null,
+        ?string $promptVersion = null,
     ): AnthropicResponse {
         // Pre-call gate: block before any request leaves the app.
         $this->spend->assertWithinCaps($this->user);
@@ -53,7 +57,7 @@ class AnthropicClient
         [$response, $connectionError] = $this->sendWithRetry($payload);
 
         if ($connectionError !== null) {
-            $this->record($model, $purpose, 0, 0, 0, 'error', $connectionError->getMessage(), $referenceType, $referenceId);
+            $this->record($model, $purpose, $promptVersion, 0, 0, 0, 'error', $connectionError->getMessage(), $referenceType, $referenceId);
 
             throw new AnthropicException(
                 'Could not reach the Anthropic API: '.$connectionError->getMessage(),
@@ -63,7 +67,7 @@ class AnthropicClient
 
         if (! $response->successful()) {
             $message = $this->errorMessage($response);
-            $this->record($model, $purpose, 0, 0, 0, 'error', $message, $referenceType, $referenceId);
+            $this->record($model, $purpose, $promptVersion, 0, 0, 0, 'error', $message, $referenceType, $referenceId);
 
             if (in_array($response->status(), [401, 403], true)) {
                 throw AnthropicException::invalidKey($message);
@@ -79,7 +83,7 @@ class AnthropicClient
         $costCents = $this->estimateCostCents($resolvedModel, $inputTokens, $outputTokens);
 
         $this->record(
-            $resolvedModel, $purpose, $inputTokens, $outputTokens, $costCents,
+            $resolvedModel, $purpose, $promptVersion, $inputTokens, $outputTokens, $costCents,
             'ok', null, $referenceType, $referenceId,
         );
 
@@ -151,6 +155,7 @@ class AnthropicClient
     private function record(
         string $model,
         string $purpose,
+        ?string $promptVersion,
         int $inputTokens,
         int $outputTokens,
         int $costCents,
@@ -168,6 +173,7 @@ class AnthropicClient
             'output_tokens' => $outputTokens,
             'cost_cents' => $costCents,
             'purpose' => $purpose,
+            'prompt_version' => $promptVersion,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
             'status' => $status,

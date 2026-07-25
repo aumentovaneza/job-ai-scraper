@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'user_id', 'provider', 'model', 'endpoint', 'input_tokens', 'output_tokens',
-    'cost_cents', 'purpose', 'reference_type', 'reference_id', 'status', 'error',
+    'cost_cents', 'purpose', 'prompt_version', 'reference_type', 'reference_id',
+    'status', 'error',
 ])]
 class AiCall extends Model
 {
