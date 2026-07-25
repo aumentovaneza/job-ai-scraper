@@ -2,6 +2,7 @@
 
 use App\Jobs\DedupeJobJob;
 use App\Jobs\EmbedJobPostingJob;
+use App\Jobs\EnrichJobJob;
 use App\Jobs\ScrapeAtsFeedJob;
 use App\Models\JobPosting;
 use App\Models\JobSource;
@@ -49,6 +50,8 @@ it('creates a canonical posting and a source hit for a new job', function () {
     expect(JobPosting::count())->toBe(1);
     expect(JobSourceHit::where('job_source_id', $source->id)->count())->toBe(1);
     Queue::assertPushed(EmbedJobPostingJob::class, 1);
+    // A new posting also kicks off AI enrichment, funded by the source's user.
+    Queue::assertPushed(EnrichJobJob::class, 1);
 });
 
 it('is idempotent: the same job twice yields one posting and one hit', function () {

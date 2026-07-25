@@ -43,6 +43,9 @@ class DedupeJobJob implements ShouldQueue
 
         if ($result->isNew) {
             EmbedJobPostingJob::dispatch($result->posting->id);
+            // The scraping user's BYOK key funds enrichment; the result is
+            // cached on the shared posting for every user (T-31).
+            EnrichJobJob::dispatch($result->posting->id, $source->user_id);
         }
     }
 }
