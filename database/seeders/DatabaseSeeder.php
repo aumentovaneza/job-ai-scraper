@@ -5,21 +5,38 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed the owner/admin account from env (T-09). On Laravel Cloud the deploy
+     * runs `php artisan migrate --seed`; the owner then invites test users from
+     * the admin panel. Idempotent — safe to run on every deploy.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $email = env('OWNER_EMAIL');
+        $password = env('OWNER_PASSWORD');
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if (blank($email) || blank($password)) {
+            $this->command?->warn('OWNER_EMAIL / OWNER_PASSWORD not set — skipping owner seed.');
+
+            return;
+        }
+
+        User::updateOrCreate(
+            ['email' => strtolower($email)],
+            [
+                'name' => env('OWNER_NAME', 'Owner'),
+                'password' => Hash::make($password),
+                'is_admin' => true,
+                'email_verified_at' => now(),
+            ],
+        );
+
+        $this->command?->info("Owner account ensured for {$email}.");
     }
 }
