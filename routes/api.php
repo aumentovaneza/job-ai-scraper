@@ -1,7 +1,7 @@
 <?php
 
+use App\Http\Controllers\AiKeyController;
 use App\Http\Controllers\AiUsageController;
-use App\Http\Controllers\AnthropicKeyController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\JobPostingController;
@@ -35,10 +35,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/job-sources/{jobSource}', [JobSourceController::class, 'update']);
     Route::delete('/job-sources/{jobSource}', [JobSourceController::class, 'destroy']);
 
-    // BYOK: per-user Anthropic key management (T-10).
-    Route::get('/anthropic-key', [AnthropicKeyController::class, 'show']);
-    Route::post('/anthropic-key', [AnthropicKeyController::class, 'store']);
-    Route::delete('/anthropic-key', [AnthropicKeyController::class, 'destroy']);
+    // BYOK: per-user AI key management for each provider (T-10).
+    Route::get('/ai-key', [AiKeyController::class, 'show']);
+    Route::post('/ai-key', [AiKeyController::class, 'store']);
+    Route::delete('/ai-key', [AiKeyController::class, 'destroy']);
+
+    // Switch the user's active AI provider (Claude / ChatGPT).
+    Route::put('/ai-provider', [ProfileController::class, 'setProvider']);
 
     // Profile + onboarding: targets, resume ingestion, voice profile (T-12/T-13/T-14).
     Route::get('/profile', [ProfileController::class, 'show']);

@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
  * and share these mutations, so they live together here.
  */
 
+export type AiProvider = 'anthropic' | 'openai';
+
 export interface KeyStatus {
     has_key: boolean;
     masked: string | null;
@@ -39,7 +41,8 @@ export interface OnboardingStatus {
 
 export interface ProfilePayload {
     profile: ProfileData;
-    key: KeyStatus;
+    ai_provider: AiProvider;
+    providers: Record<AiProvider, KeyStatus>;
     settings: SettingsData;
     onboarding: OnboardingStatus;
 }
@@ -83,15 +86,19 @@ export function useAiUsage() {
     });
 }
 
+export interface StoreKeyResult {
+    verified: boolean;
+    key: KeyStatus;
+    provider: string;
+    message: string;
+}
+
 export function useStoreKey() {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: async (key: string) => {
+        mutationFn: async ({ provider, key }: { provider: AiProvider; key: string }) => {
             await csrf();
-            const { data } = await api.post<{ verified: boolean; key: KeyStatus; message: string }>(
-                '/api/anthropic-key',
-                { key }
-            );
+            const { data } = await api.post<StoreKeyResult>('/api/ai-key', { provider, key });
             return data;
         },
         onSuccess: () => qc.invalidateQueries({ queryKey: PROFILE_KEY }),
@@ -101,11 +108,23 @@ export function useStoreKey() {
 export function useDeleteKey() {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: async () => {
+        mutationFn: async ({ provider }: { provider: AiProvider }) => {
             await csrf();
-            await api.delete('/api/anthropic-key');
+            await api.delete('/api/ai-key', { data: { provider } });
         },
         onSuccess: () => qc.invalidateQueries({ queryKey: PROFILE_KEY }),
+    });
+}
+
+export function useSetProvider() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async (provider: AiProvider) => {
+            await csrf();
+            const { data } = await api.put<ProfilePayload>('/api/ai-provider', { provider });
+            return data;
+        },
+        onSuccess: (data) => qc.setQueryData(PROFILE_KEY, data),
     });
 }
 

@@ -5,8 +5,9 @@ namespace Tests\Feature;
 use App\Jobs\ExtractVoiceProfileJob;
 use App\Models\Profile;
 use App\Models\User;
-use App\Services\Ai\AnthropicClientFactory;
-use App\Services\Ai\AnthropicKeyService;
+use App\Services\Ai\AiClientFactory;
+use App\Services\Ai\AiKeyService;
+use App\Services\Ai\AiProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -31,11 +32,11 @@ class ExtractVoiceProfileJobTest extends TestCase
         ], 200)]);
 
         $user = User::factory()->create();
-        app(AnthropicKeyService::class)->store($user, 'sk-ant-key-abcdef123456');
+        app(AiKeyService::class)->store($user, AiProvider::Anthropic, 'sk-ant-key-abcdef123456');
         $profile = $user->profile()->create(['resume_text' => 'Ten years of backend work.']);
 
         (new ExtractVoiceProfileJob($profile->id, 'I favor calm, reliable systems.'))
-            ->handle(app(AnthropicClientFactory::class));
+            ->handle(app(AiClientFactory::class));
 
         $stored = $profile->fresh()->voice_profile;
         $this->assertSame('professional', $stored['formality']);
@@ -55,11 +56,11 @@ class ExtractVoiceProfileJobTest extends TestCase
     {
         Http::fake();
         $user = User::factory()->create();
-        app(AnthropicKeyService::class)->store($user, 'sk-ant-key-abcdef123456');
+        app(AiKeyService::class)->store($user, AiProvider::Anthropic, 'sk-ant-key-abcdef123456');
         $profile = $user->profile()->create(['resume_text' => null]);
 
         (new ExtractVoiceProfileJob($profile->id))
-            ->handle(app(AnthropicClientFactory::class));
+            ->handle(app(AiClientFactory::class));
 
         $this->assertNull($profile->fresh()->voice_profile);
         Http::assertNothingSent();

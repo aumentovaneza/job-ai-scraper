@@ -16,7 +16,7 @@ use Illuminate\Notifications\Notifiable;
     'name', 'email', 'password', 'is_admin', 'timezone',
     'daily_ai_spend_cap_cents', 'weekly_ai_spend_cap_cents',
 ])]
-#[Hidden(['password', 'remember_token', 'encrypted_anthropic_key'])]
+#[Hidden(['password', 'remember_token', 'encrypted_anthropic_key', 'encrypted_openai_key'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -34,6 +34,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'anthropic_key_verified_at' => 'datetime',
+            'openai_key_verified_at' => 'datetime',
             'daily_ai_spend_cap_cents' => 'integer',
             'weekly_ai_spend_cap_cents' => 'integer',
         ];

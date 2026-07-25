@@ -85,4 +85,32 @@ return [
         ],
     ],
 
+    /*
+    | OpenAI (per-user BYOK) — the ChatGPT alternative to Anthropic. Mirrors the
+    | anthropic block: routing, default + verify models, retry policy, and the
+    | pricing table used to estimate ai_calls.cost_cents. Keys are per-user and
+    | stored encrypted on users.encrypted_openai_key — nothing here is a secret.
+    */
+    'openai' => [
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com'),
+
+        // Model for real user-facing work (enrichment, letters).
+        'model' => env('OPENAI_MODEL', 'gpt-4o'),
+
+        // A cheap, fast model is enough for the BYOK liveness ping.
+        'verify_model' => env('OPENAI_VERIFY_MODEL', 'gpt-4o-mini'),
+
+        'timeout' => (int) env('OPENAI_TIMEOUT', 60),
+        'max_retries' => (int) env('OPENAI_MAX_RETRIES', 2),
+        'retry_base_ms' => (int) env('OPENAI_RETRY_BASE_MS', 500),
+
+        // Cost per 1M tokens, in cents (input, output). Keep in sync with pricing.
+        'pricing' => [
+            'gpt-4o' => ['input' => 250, 'output' => 1000],
+            'gpt-4o-mini' => ['input' => 15, 'output' => 60],
+            'gpt-4.1' => ['input' => 200, 'output' => 800],
+            'gpt-4.1-mini' => ['input' => 40, 'output' => 160],
+        ],
+    ],
+
 ];
