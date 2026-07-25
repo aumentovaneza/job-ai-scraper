@@ -20,11 +20,15 @@ interface AiClient
      *                          `max_tokens` (int). `model` defaults to the
      *                          provider's configured work model when absent.
      * @param  string  $purpose  ai_calls.purpose tag (e.g. 'voice_profile').
+     * @param  string|null  $promptVersion  Versioned prompt name recorded on the
+     *                                      ai_calls row so output stays reproducible
+     *                                      (e.g. 'enrich_job.v1'). See Prompt.
      */
     public function messages(
         array $payload,
         string $purpose,
         ?string $referenceType = null,
         ?int $referenceId = null,
+        ?string $promptVersion = null,
     ): AiResponse;
 }

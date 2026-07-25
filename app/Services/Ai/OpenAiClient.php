@@ -38,6 +38,7 @@ class OpenAiClient implements AiClient
         string $purpose,
         ?string $referenceType = null,
         ?int $referenceId = null,
+        ?string $promptVersion = null,
     ): AiResponse {
         // Pre-call gate: block before any request leaves the app.
         $this->spend->assertWithinCaps($this->user);
@@ -47,7 +48,7 @@ class OpenAiClient implements AiClient
         [$response, $connectionError] = $this->sendWithRetry($payload);
 
         if ($connectionError !== null) {
-            $this->record($model, $purpose, 0, 0, 0, 'error', $connectionError->getMessage(), $referenceType, $referenceId);
+            $this->record($model, $purpose, $promptVersion, 0, 0, 0, 'error', $connectionError->getMessage(), $referenceType, $referenceId);
 
             throw new AiException(
                 'Could not reach the OpenAI API: '.$connectionError->getMessage(),
@@ -57,7 +58,7 @@ class OpenAiClient implements AiClient
 
         if (! $response->successful()) {
             $message = $this->errorMessage($response);
-            $this->record($model, $purpose, 0, 0, 0, 'error', $message, $referenceType, $referenceId);
+            $this->record($model, $purpose, $promptVersion, 0, 0, 0, 'error', $message, $referenceType, $referenceId);
 
             if (in_array($response->status(), [401, 403], true)) {
                 throw AiException::invalidKey($message);
@@ -73,7 +74,7 @@ class OpenAiClient implements AiClient
         $costCents = $this->estimateCostCents($resolvedModel, $inputTokens, $outputTokens);
 
         $this->record(
-            $resolvedModel, $purpose, $inputTokens, $outputTokens, $costCents,
+            $resolvedModel, $purpose, $promptVersion, $inputTokens, $outputTokens, $costCents,
             'ok', null, $referenceType, $referenceId,
         );
 
@@ -152,6 +153,7 @@ class OpenAiClient implements AiClient
     private function record(
         string $model,
         string $purpose,
+        ?string $promptVersion,
         int $inputTokens,
         int $outputTokens,
         int $costCents,
@@ -169,6 +171,7 @@ class OpenAiClient implements AiClient
             'output_tokens' => $outputTokens,
             'cost_cents' => $costCents,
             'purpose' => $purpose,
+            'prompt_version' => $promptVersion,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
             'status' => $status,
