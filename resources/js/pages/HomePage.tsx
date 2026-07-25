@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -24,9 +24,16 @@ export default function HomePage() {
                 </p>
             </div>
 
-            <Button variant="outline" onClick={handleLogout}>
-                Sign out
-            </Button>
+            <div className="flex items-center gap-3">
+                {user?.is_admin && (
+                    <Button variant="outline" asChild>
+                        <Link to="/admin/invitations">Invitations</Link>
+                    </Button>
+                )}
+                <Button variant="outline" onClick={handleLogout}>
+                    Sign out
+                </Button>
+            </div>
         </div>
     );
 }
