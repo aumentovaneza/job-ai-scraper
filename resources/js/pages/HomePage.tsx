@@ -5,8 +5,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 /**
  * Landing page for the authenticated SPA shell. Quick links out to the
- * scraping pipeline screens (job feed, job sources); more will land as
- * later phases (matching, tracker, letters) ship.
+ * scraping pipeline screens (job feed, job sources) and account settings;
+ * more will land as later phases (matching, tracker, letters) ship.
  */
 export default function HomePage() {
     const user = useAuthStore((s) => s.user);
@@ -22,7 +22,7 @@ export default function HomePage() {
                     </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                     <Link to="/jobs">
                         <Card className="h-full transition-colors hover:bg-accent">
                             <CardHeader>
@@ -39,6 +39,16 @@ export default function HomePage() {
                                 <CardTitle>Job sources</CardTitle>
                                 <CardDescription>
                                     Manage ATS feeds, career pages, and RSS feeds the scraper pulls from.
+                                </CardDescription>
+                            </CardHeader>
+                        </Card>
+                    </Link>
+                    <Link to="/settings">
+                        <Card className="h-full transition-colors hover:bg-accent">
+                            <CardHeader>
+                                <CardTitle>Settings</CardTitle>
+                                <CardDescription>
+                                    Manage your Anthropic key, resume, targets, and AI spend caps.
                                 </CardDescription>
                             </CardHeader>
                         </Card>

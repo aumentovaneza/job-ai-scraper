@@ -6,11 +6,12 @@ const links = [
     { to: '/', label: 'Home' },
     { to: '/jobs', label: 'Jobs' },
     { to: '/sources', label: 'Sources' },
+    { to: '/settings', label: 'Settings' },
 ] as const;
 
 /**
  * Shared header/nav for authenticated pages. Lets the user reach the job
- * feed and job sources screens from anywhere, plus sign out.
+ * feed, job sources, and settings screens from anywhere, plus sign out.
  */
 export function AppNav() {
     const location = useLocation();
