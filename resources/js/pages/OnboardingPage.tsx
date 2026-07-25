@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AnthropicKeyPanel } from '@/components/AnthropicKeyPanel';
+import { AiKeyPanel } from '@/components/AiKeyPanel';
+import { ProviderToggle } from '@/components/ProviderToggle';
 import {
     type ProfilePayload,
     useExtractVoice,
@@ -14,10 +15,10 @@ import {
     useUploadResume,
 } from '@/hooks/useProfile';
 
-const STEPS = ['API key', 'Resume', 'Targets'] as const;
+const STEPS = ['AI provider', 'Resume', 'Targets'] as const;
 
 /**
- * Post-invite onboarding wizard (T-12): verify an Anthropic key, upload a resume,
+ * Post-invite onboarding wizard (T-12): verify your AI provider's API key, upload a resume,
  * then set target roles/locations/comp. The owner runs the same flow. Steps gate
  * on the server-computed onboarding status so the user can't skip a requirement.
  */
@@ -107,12 +108,13 @@ function KeyStep({ data }: { data: ProfilePayload }) {
     return (
         <div className="space-y-4">
             <div className="space-y-1">
-                <h2 className="font-medium">Add your Anthropic API key</h2>
+                <h2 className="font-medium">Choose your AI provider</h2>
                 <p className="text-sm text-muted-foreground">
-                    JobScope uses your key to enrich jobs and draft letters. You control the spend.
+                    JobScope uses your API key to enrich jobs and draft letters. You control the spend.
                 </p>
             </div>
-            <AnthropicKeyPanel status={data.key} />
+            <ProviderToggle value={data.ai_provider} />
+            <AiKeyPanel provider={data.ai_provider} status={data.providers[data.ai_provider]} />
         </div>
     );
 }

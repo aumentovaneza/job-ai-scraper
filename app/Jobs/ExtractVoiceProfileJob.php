@@ -3,9 +3,9 @@
 namespace App\Jobs;
 
 use App\Exceptions\Ai\AiBudgetExceededException;
-use App\Exceptions\Ai\AnthropicException;
+use App\Exceptions\Ai\AiException;
 use App\Models\Profile;
-use App\Services\Ai\AnthropicClientFactory;
+use App\Services\Ai\AiClientFactory;
 use App\Services\Ai\Prompt;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -28,7 +28,7 @@ class ExtractVoiceProfileJob implements ShouldQueue
         public readonly ?string $writingSample = null,
     ) {}
 
-    public function handle(AnthropicClientFactory $factory): void
+    public function handle(AiClientFactory $factory): void
     {
         // Worker context is unauthenticated; bypass the BelongsToUser scope and
         // resolve the owning user explicitly.
@@ -55,7 +55,7 @@ class ExtractVoiceProfileJob implements ShouldQueue
                 referenceType: Profile::class,
                 referenceId: $profile->id,
             );
-        } catch (AiBudgetExceededException|AnthropicException $e) {
+        } catch (AiBudgetExceededException|AiException $e) {
             // Ledger already records the failure; surface breakage in logs and stop.
             Log::warning('Voice profile extraction failed', [
                 'profile_id' => $profile->id,

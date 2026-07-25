@@ -9,10 +9,12 @@ use App\Http\Requests\Profile\UploadResumeRequest;
 use App\Jobs\ExtractVoiceProfileJob;
 use App\Models\Profile;
 use App\Models\User;
-use App\Services\Ai\AnthropicKeyService;
+use App\Services\Ai\AiKeyService;
+use App\Services\Ai\AiProvider;
 use App\Services\ResumeParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * The authenticated user's matching profile + onboarding state (T-12/T-13/T-14).
@@ -22,11 +24,26 @@ use Illuminate\Http\Request;
  */
 class ProfileController extends Controller
 {
-    public function __construct(private readonly AnthropicKeyService $keys) {}
+    public function __construct(private readonly AiKeyService $keys) {}
 
     public function show(Request $request): JsonResponse
     {
         return response()->json($this->payload($request->user()));
+    }
+
+    /**
+     * Switch the user's active AI provider (Claude / ChatGPT) and return the
+     * refreshed snapshot so the SPA re-renders against the new provider's key.
+     */
+    public function setProvider(Request $request): JsonResponse
+    {
+        $provider = AiProvider::from($request->validate([
+            'provider' => ['required', Rule::enum(AiProvider::class)],
+        ])['provider']);
+
+        $this->keys->setActiveProvider($request->user(), $provider);
+
+        return response()->json($this->payload($request->user()->refresh()));
     }
 
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -72,8 +89,12 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Upload a resume before generating a voice profile.'], 422);
         }
 
-        if ($user->anthropic_key_verified_at === null) {
-            return response()->json(['message' => 'Add and verify your Anthropic key first.'], 422);
+        $provider = $this->keys->activeProvider($user);
+
+        if (! $this->keys->isVerified($user, $provider)) {
+            return response()->json([
+                'message' => "Add and verify your {$provider->label()} key first.",
+            ], 422);
         }
 
         ExtractVoiceProfileJob::dispatch($profile->id, $request->validated('writing_sample'));
@@ -94,7 +115,8 @@ class ProfileController extends Controller
     {
         $profile = $this->profileFor($user);
 
-        $keyVerified = $user->anthropic_key_verified_at !== null;
+        $activeProvider = $this->keys->activeProvider($user);
+        $keyVerified = $this->keys->isVerified($user, $activeProvider);
         $hasResume = filled($profile->resume_text);
         $hasTargets = ! empty($profile->target_roles);
 
@@ -109,10 +131,10 @@ class ProfileController extends Controller
                 'has_voice_profile' => ! empty($profile->voice_profile),
                 'updated_at' => optional($profile->updated_at)?->toIso8601String(),
             ],
-            'key' => [
-                'has_key' => $this->keys->hasKey($user),
-                'masked' => $this->keys->masked($user),
-                'verified_at' => optional($user->anthropic_key_verified_at)?->toIso8601String(),
+            'ai_provider' => $activeProvider->value,
+            'providers' => [
+                AiProvider::Anthropic->value => $this->keys->status($user, AiProvider::Anthropic),
+                AiProvider::OpenAi->value => $this->keys->status($user, AiProvider::OpenAi),
             ],
             'settings' => [
                 'timezone' => $user->timezone,

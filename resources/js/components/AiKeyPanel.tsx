@@ -2,16 +2,23 @@ import { type FormEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type KeyStatus, useDeleteKey, useStoreKey } from '@/hooks/useProfile';
+import { type AiProvider, type KeyStatus, useDeleteKey, useStoreKey } from '@/hooks/useProfile';
+
+const PROVIDER_COPY: Record<AiProvider, { label: string; placeholder: string }> = {
+    anthropic: { label: 'Anthropic API key', placeholder: 'sk-ant-…' },
+    openai: { label: 'OpenAI API key', placeholder: 'sk-…' },
+};
 
 /**
  * BYOK key management, shared by the onboarding wizard (T-12) and settings
  * (T-15). Pasting a key verifies it inline with a 1-token ping; a stored key is
  * shown masked with its verification state and can be replaced or removed.
+ * Provider-agnostic: works for either Anthropic or OpenAI depending on `provider`.
  */
-export function AnthropicKeyPanel({ status }: { status: KeyStatus }) {
+export function AiKeyPanel({ provider, status }: { provider: AiProvider; status: KeyStatus }) {
     const storeKey = useStoreKey();
     const deleteKey = useDeleteKey();
+    const copy = PROVIDER_COPY[provider];
 
     const [key, setKey] = useState('');
     const [editing, setEditing] = useState(!status.has_key);
@@ -22,7 +29,7 @@ export function AnthropicKeyPanel({ status }: { status: KeyStatus }) {
         e.preventDefault();
         setMessage(null);
         try {
-            const result = await storeKey.mutateAsync(key.trim());
+            const result = await storeKey.mutateAsync({ provider, key: key.trim() });
             setKey('');
             setOk(result.verified);
             setMessage(result.message);
@@ -36,7 +43,7 @@ export function AnthropicKeyPanel({ status }: { status: KeyStatus }) {
     }
 
     async function handleRemove() {
-        await deleteKey.mutateAsync();
+        await deleteKey.mutateAsync({ provider });
         setEditing(true);
         setOk(null);
         setMessage(null);
@@ -79,12 +86,12 @@ export function AnthropicKeyPanel({ status }: { status: KeyStatus }) {
     return (
         <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
-                <Label htmlFor="anthropic-key">Anthropic API key</Label>
+                <Label htmlFor="ai-key">{copy.label}</Label>
                 <Input
-                    id="anthropic-key"
+                    id="ai-key"
                     type="password"
                     autoComplete="off"
-                    placeholder="sk-ant-…"
+                    placeholder={copy.placeholder}
                     value={key}
                     onChange={(e) => setKey(e.target.value)}
                     required
