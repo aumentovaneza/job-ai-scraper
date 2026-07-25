@@ -4,6 +4,8 @@ import { AdminRoute } from '@/components/AdminRoute';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import HomePage from '@/pages/HomePage';
+import JobSourcesPage from '@/pages/JobSourcesPage';
+import JobsPage from '@/pages/JobsPage';
 import LoginPage from '@/pages/LoginPage';
 import InvitationsPage from '@/pages/admin/InvitationsPage';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -31,6 +33,22 @@ export default function App() {
                 element={
                     <ProtectedRoute>
                         <HomePage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/jobs"
+                element={
+                    <ProtectedRoute>
+                        <JobsPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/sources"
+                element={
+                    <ProtectedRoute>
+                        <JobSourcesPage />
                     </ProtectedRoute>
                 }
             />

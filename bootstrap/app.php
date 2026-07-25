@@ -1,7 +1,9 @@
 <?php
 
+use App\Console\Commands\ScrapeSourcesCommand;
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +17,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function (Schedule $schedule): void {
+        // Runs every minute; the command itself dispatches only the sources
+        // whose per-source cron_schedule is due (T-26).
+        $schedule->command(ScrapeSourcesCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping();
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         // Correlation id on every request, for structured logging (T-07).
         $middleware->prepend(AssignRequestId::class);
