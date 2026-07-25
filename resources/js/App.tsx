@@ -5,6 +5,8 @@ import { OnboardingGate } from '@/components/OnboardingGate';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import HomePage from '@/pages/HomePage';
+import JobSourcesPage from '@/pages/JobSourcesPage';
+import JobsPage from '@/pages/JobsPage';
 import LoginPage from '@/pages/LoginPage';
 import OnboardingPage from '@/pages/OnboardingPage';
 import SettingsPage from '@/pages/SettingsPage';
@@ -54,6 +56,22 @@ export default function App() {
                         <OnboardingGate>
                             <SettingsPage />
                         </OnboardingGate>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/jobs"
+                element={
+                    <ProtectedRoute>
+                        <JobsPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/sources"
+                element={
+                    <ProtectedRoute>
+                        <JobSourcesPage />
                     </ProtectedRoute>
                 }
             />

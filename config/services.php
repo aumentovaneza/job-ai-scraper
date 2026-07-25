@@ -35,6 +35,24 @@ return [
         ],
     ],
 
+    // Firecrawl — structured scraping of company career pages (T-20/T-23).
+    // Project-level key (not BYOK). Empty key disables live scraping locally.
+    'firecrawl' => [
+        'key' => env('FIRECRAWL_API_KEY'),
+        'base_url' => env('FIRECRAWL_BASE_URL', 'https://api.firecrawl.dev'),
+        'timeout' => (int) env('FIRECRAWL_TIMEOUT', 60),
+    ],
+
+    // Voyage AI — job embeddings for semantic dedup/search (T-25). Owner-funded,
+    // single project key. `dimensions` must match the pgvector column (1024).
+    'voyage' => [
+        'key' => env('VOYAGE_API_KEY'),
+        'base_url' => env('VOYAGE_BASE_URL', 'https://api.voyageai.com/v1'),
+        'model' => env('VOYAGE_MODEL', 'voyage-3-lite'),
+        'dimensions' => (int) env('VOYAGE_DIMENSIONS', 1024),
+        'timeout' => (int) env('VOYAGE_TIMEOUT', 30),
+    ],
+
     /*
     | Anthropic Claude (per-user BYOK). Keys are supplied by each user and stored
     | encrypted on users.encrypted_anthropic_key — nothing here is a secret. This
