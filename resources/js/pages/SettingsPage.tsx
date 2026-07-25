@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AnthropicKeyPanel } from '@/components/AnthropicKeyPanel';
+import { AiKeyPanel } from '@/components/AiKeyPanel';
+import { ProviderToggle } from '@/components/ProviderToggle';
 import {
     type AiUsage,
     type ProfilePayload,
@@ -20,7 +21,7 @@ function dollars(cents: number): string {
 }
 
 /**
- * Account settings (T-15): manage the Anthropic key, spend caps, and timezone,
+ * Account settings (T-15): manage the AI provider + key, spend caps, and timezone,
  * plus a live "AI spend this week" indicator read from the ai_calls ledger.
  */
 export default function SettingsPage() {
@@ -45,8 +46,9 @@ export default function SettingsPage() {
             </div>
 
             <section className="space-y-3">
-                <h2 className="font-medium">Anthropic API key</h2>
-                <AnthropicKeyPanel status={data.key} />
+                <h2 className="font-medium">AI provider</h2>
+                <ProviderToggle value={data.ai_provider} />
+                <AiKeyPanel provider={data.ai_provider} status={data.providers[data.ai_provider]} />
             </section>
 
             {usage.data && <SpendIndicator usage={usage.data} />}

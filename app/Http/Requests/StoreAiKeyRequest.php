@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Ai\AiProvider;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class StoreAnthropicKeyRequest extends FormRequest
+class StoreAiKeyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,8 +18,9 @@ class StoreAnthropicKeyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Anthropic keys look like sk-ant-…; keep the prefix check soft (a
-            // custom base_url/proxy may differ) but require a plausible length.
+            'provider' => ['required', Rule::enum(AiProvider::class)],
+            // Provider keys look like sk-ant-… / sk-…; keep the prefix check soft
+            // (a custom base_url/proxy may differ) but require a plausible length.
             'key' => ['required', 'string', 'min:20', 'max:255'],
         ];
     }

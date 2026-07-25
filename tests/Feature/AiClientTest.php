@@ -3,17 +3,18 @@
 namespace Tests\Feature;
 
 use App\Exceptions\Ai\AiBudgetExceededException;
-use App\Exceptions\Ai\AnthropicException;
+use App\Exceptions\Ai\AiException;
 use App\Models\AiCall;
 use App\Models\User;
-use App\Services\Ai\AnthropicClientFactory;
-use App\Services\Ai\AnthropicKeyService;
+use App\Services\Ai\AiClientFactory;
+use App\Services\Ai\AiKeyService;
+use App\Services\Ai\AiProvider;
 use App\Services\Ai\SpendTracker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class AnthropicClientTest extends TestCase
+class AiClientTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -21,17 +22,24 @@ class AnthropicClientTest extends TestCase
     {
         parent::setUp();
         // Keep retry backoff instant in tests.
-        config(['services.anthropic.retry_base_ms' => 0]);
+        config(['services.anthropic.retry_base_ms' => 0, 'services.openai.retry_base_ms' => 0]);
     }
 
-    private function clientFor(User $user)
+    private function anthropicClientFor(User $user)
     {
-        app(AnthropicKeyService::class)->store($user, 'sk-ant-key-abcdef123456');
+        app(AiKeyService::class)->store($user, AiProvider::Anthropic, 'sk-ant-key-abcdef123456');
 
-        return app(AnthropicClientFactory::class)->forUser($user->fresh());
+        return app(AiClientFactory::class)->for($user->fresh(), AiProvider::Anthropic);
     }
 
-    public function test_records_ai_call_and_returns_text_on_success(): void
+    private function openAiClientFor(User $user)
+    {
+        app(AiKeyService::class)->store($user, AiProvider::OpenAi, 'sk-openai-key-abcdef123456');
+
+        return app(AiClientFactory::class)->for($user->fresh(), AiProvider::OpenAi);
+    }
+
+    public function test_anthropic_records_ai_call_and_returns_text_on_success(): void
     {
         Http::fake(['api.anthropic.com/*' => Http::response([
             'model' => 'claude-opus-4-8',
@@ -41,7 +49,7 @@ class AnthropicClientTest extends TestCase
 
         $user = User::factory()->create();
 
-        $response = $this->clientFor($user)->messages(
+        $response = $this->anthropicClientFor($user)->messages(
             ['max_tokens' => 16, 'messages' => [['role' => 'user', 'content' => 'hi']]],
             purpose: 'voice_profile',
         );
@@ -59,6 +67,38 @@ class AnthropicClientTest extends TestCase
         ]);
     }
 
+    public function test_openai_records_ai_call_and_returns_text_on_success(): void
+    {
+        Http::fake(['api.openai.com/*' => Http::response([
+            'model' => 'gpt-4o',
+            'choices' => [['message' => ['role' => 'assistant', 'content' => 'hello world']]],
+            'usage' => ['prompt_tokens' => 1_000_000, 'completion_tokens' => 400_000],
+        ], 200)]);
+
+        $user = User::factory()->create();
+
+        $response = $this->openAiClientFor($user)->messages(
+            ['max_tokens' => 16, 'messages' => [['role' => 'user', 'content' => 'hi']]],
+            purpose: 'voice_profile',
+        );
+
+        $this->assertSame('hello world', $response->text);
+        // 1M input @ $2.50 + 0.4M output @ $10 = 250 + 400 = 650 cents.
+        $this->assertSame(650, $response->costCents);
+
+        $this->assertDatabaseHas('ai_calls', [
+            'user_id' => $user->id,
+            'provider' => 'openai',
+            'endpoint' => 'chat.completions',
+            'purpose' => 'voice_profile',
+            'status' => 'ok',
+            'cost_cents' => 650,
+        ]);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'openai.com/v1/chat/completions')
+            && $request->hasHeader('Authorization', 'Bearer sk-openai-key-abcdef123456'));
+    }
+
     public function test_records_error_and_throws_invalid_key_on_401(): void
     {
         Http::fake(['api.anthropic.com/*' => Http::response(['error' => ['message' => 'invalid x-api-key']], 401)]);
@@ -66,12 +106,12 @@ class AnthropicClientTest extends TestCase
         $user = User::factory()->create();
 
         try {
-            $this->clientFor($user)->messages(
+            $this->anthropicClientFor($user)->messages(
                 ['messages' => [['role' => 'user', 'content' => 'hi']]],
                 purpose: 'voice_profile',
             );
-            $this->fail('Expected AnthropicException.');
-        } catch (AnthropicException $e) {
+            $this->fail('Expected AiException.');
+        } catch (AiException $e) {
             $this->assertTrue($e->invalidKey);
         }
 
@@ -90,7 +130,7 @@ class AnthropicClientTest extends TestCase
 
         $user = User::factory()->create();
 
-        $response = $this->clientFor($user)->messages(
+        $response = $this->anthropicClientFor($user)->messages(
             ['messages' => [['role' => 'user', 'content' => 'hi']]],
             purpose: 'voice_profile',
         );
@@ -114,7 +154,7 @@ class AnthropicClientTest extends TestCase
         $this->expectException(AiBudgetExceededException::class);
 
         try {
-            $this->clientFor($user->fresh())->messages(
+            $this->anthropicClientFor($user->fresh())->messages(
                 ['messages' => [['role' => 'user', 'content' => 'hi']]],
                 purpose: 'voice_profile',
             );
@@ -136,5 +176,28 @@ class AnthropicClientTest extends TestCase
         $spend = app(SpendTracker::class);
         $this->assertSame(250, $spend->spentTodayCents($userA));
         $this->assertSame(0, $spend->spentTodayCents($userB));
+    }
+
+    public function test_factory_uses_the_users_active_provider(): void
+    {
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'model' => 'gpt-4o',
+                'choices' => [['message' => ['content' => 'from openai']]],
+                'usage' => ['prompt_tokens' => 0, 'completion_tokens' => 0],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $keys = app(AiKeyService::class);
+        $keys->store($user, AiProvider::OpenAi, 'sk-openai-key-abcdef123456');
+        $keys->setActiveProvider($user, AiProvider::OpenAi);
+
+        $response = app(AiClientFactory::class)->forUser($user->fresh())->messages(
+            ['messages' => [['role' => 'user', 'content' => 'hi']]],
+            purpose: 'voice_profile',
+        );
+
+        $this->assertSame('from openai', $response->text);
     }
 }
