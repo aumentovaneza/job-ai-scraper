@@ -25,6 +25,9 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center gap-3">
+                <Button variant="outline" asChild>
+                    <Link to="/settings">Settings</Link>
+                </Button>
                 {user?.is_admin && (
                     <Button variant="outline" asChild>
                         <Link to="/admin/invitations">Invitations</Link>

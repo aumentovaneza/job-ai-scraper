@@ -1,8 +1,12 @@
 <?php
 
+use App\Http\Controllers\AiUsageController;
+use App\Http\Controllers\AnthropicKeyController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\JobPostingController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth endpoint. SPA calls /sanctum/csrf-cookie first, then /login.
@@ -21,6 +25,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Job catalog feed: keyword search + filters (T-06).
     Route::get('/jobs', [JobPostingController::class, 'index']);
+
+    // BYOK: per-user Anthropic key management (T-10).
+    Route::get('/anthropic-key', [AnthropicKeyController::class, 'show']);
+    Route::post('/anthropic-key', [AnthropicKeyController::class, 'store']);
+    Route::delete('/anthropic-key', [AnthropicKeyController::class, 'destroy']);
+
+    // Profile + onboarding: targets, resume ingestion, voice profile (T-12/T-13/T-14).
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/resume', [ProfileController::class, 'uploadResume']);
+    Route::post('/profile/voice', [ProfileController::class, 'extractVoice']);
+
+    // Account settings + live AI spend (T-15).
+    Route::put('/settings', [SettingsController::class, 'update']);
+    Route::get('/ai/usage', [AiUsageController::class, 'show']);
 
     // Admin-only invite management (T-09).
     Route::middleware('admin')->group(function () {
