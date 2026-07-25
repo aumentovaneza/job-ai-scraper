@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AdminRoute } from '@/components/AdminRoute';
+import { OnboardingGate } from '@/components/OnboardingGate';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
+import OnboardingPage from '@/pages/OnboardingPage';
+import SettingsPage from '@/pages/SettingsPage';
 import InvitationsPage from '@/pages/admin/InvitationsPage';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -27,10 +30,30 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/invite/:token" element={<AcceptInvitePage />} />
             <Route
+                path="/onboarding"
+                element={
+                    <ProtectedRoute>
+                        <OnboardingPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
                 path="/"
                 element={
                     <ProtectedRoute>
-                        <HomePage />
+                        <OnboardingGate>
+                            <HomePage />
+                        </OnboardingGate>
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/settings"
+                element={
+                    <ProtectedRoute>
+                        <OnboardingGate>
+                            <SettingsPage />
+                        </OnboardingGate>
                     </ProtectedRoute>
                 }
             />
