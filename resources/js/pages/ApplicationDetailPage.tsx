@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { ArrowLeft, ExternalLink, FileText } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
+import { ErrorState } from '@/components/ErrorState';
 import { MatchScoreBadge } from '@/components/MatchScoreBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useAddContact, useAddNote, useApplication } from '@/hooks/useApplications';
 import { useCoverLetter } from '@/hooks/useCoverLetters';
@@ -18,7 +20,7 @@ import type { ApplicationEvent } from '@/types/applications';
 
 export default function ApplicationDetailPage() {
     const { id } = useParams<{ id: string }>();
-    const { data: application, isLoading, isError } = useApplication(id ?? '');
+    const { data: application, isLoading, isError, refetch } = useApplication(id ?? '');
 
     return (
         <div className="min-h-screen bg-background">
@@ -30,9 +32,9 @@ export default function ApplicationDetailPage() {
                     </Link>
                 </Button>
 
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                {isLoading && <ApplicationDetailSkeleton />}
                 {isError && (
-                    <p className="text-sm text-destructive">Could not load this application. Try refreshing.</p>
+                    <ErrorState message="Could not load this application." onRetry={() => void refetch()} />
                 )}
 
                 {application && (
@@ -80,6 +82,24 @@ export default function ApplicationDetailPage() {
                         <JdSnapshot jd={application.job_posting?.jd_text ?? null} />
                     </>
                 )}
+            </div>
+        </div>
+    );
+}
+
+function ApplicationDetailSkeleton() {
+    return (
+        <div className="space-y-6">
+            <div className="space-y-2">
+                <Skeleton className="h-7 w-64" />
+                <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+                <Skeleton className="h-40 w-full" />
+                <div className="space-y-6">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                </div>
             </div>
         </div>
     );
@@ -325,7 +345,7 @@ function CoverLetterCard({ applicationId }: { applicationId: number }) {
                 <CardTitle className="text-base">Cover letter</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                {isLoading && <Skeleton className="h-4 w-32" />}
                 {!isLoading && versions.length === 0 && (
                     <p className="text-sm text-muted-foreground">
                         No letter drafted yet. Generate three angled variants grounded in your resume and this

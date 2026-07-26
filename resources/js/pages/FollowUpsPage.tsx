@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Check, Copy, X } from 'lucide-react';
+import { Check, Copy, Inbox, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useFollowUps, useUpdateFollowUp, type InboxFollowUp } from '@/hooks/useFollowUps';
 
 /**
@@ -13,7 +16,7 @@ import { useFollowUps, useUpdateFollowUp, type InboxFollowUp } from '@/hooks/use
  * Nothing is auto-sent — human review always (PLAN.md §7).
  */
 export default function FollowUpsPage() {
-    const { data: followUps, isLoading, isError } = useFollowUps();
+    const { data: followUps, isLoading, isError, refetch } = useFollowUps();
 
     return (
         <div className="min-h-screen bg-background">
@@ -27,16 +30,23 @@ export default function FollowUpsPage() {
                     </p>
                 </div>
 
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                {isLoading && (
+                    <div className="space-y-4">
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full" />
+                    </div>
+                )}
                 {isError && (
-                    <p className="text-sm text-destructive">Could not load your follow-ups. Try refreshing.</p>
+                    <ErrorState message="Could not load your follow-ups." onRetry={() => void refetch()} />
                 )}
 
                 {!isLoading && !isError && (followUps?.length ?? 0) === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                        No follow-ups to review. Drafts appear here when an application sits without a stage
-                        change for a while.
-                    </p>
+                    <EmptyState
+                        icon={Inbox}
+                        title="No follow-ups to review"
+                        description="Drafts appear here when an application sits without a stage change for a while."
+                    />
                 )}
 
                 <div className="space-y-4">

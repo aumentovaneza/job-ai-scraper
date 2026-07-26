@@ -1,8 +1,10 @@
 import { type FormEvent, useState } from 'react';
+import { Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AiKeyPanel } from '@/components/AiKeyPanel';
 import { ProviderToggle } from '@/components/ProviderToggle';
 import { SnippetsPanel } from '@/components/SnippetsPanel';
@@ -13,6 +15,7 @@ import {
     useProfile,
     useUpdateSettings,
 } from '@/hooks/useProfile';
+import { downloadFile } from '@/lib/download';
 
 const TIMEZONES: string[] =
     typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['UTC'];
@@ -31,8 +34,18 @@ export default function SettingsPage() {
 
     if (isLoading || !data) {
         return (
-            <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-                Loading…
+            <div className="mx-auto max-w-2xl space-y-8 p-8">
+                <Skeleton className="h-8 w-32" />
+                <div className="space-y-3">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-24 w-full" />
+                </div>
+                <Skeleton className="h-20 w-full" />
+                <div className="space-y-3">
+                    <Skeleton className="h-5 w-28" />
+                    <Skeleton className="h-9 w-full" />
+                    <Skeleton className="h-9 w-full" />
+                </div>
             </div>
         );
     }
@@ -56,8 +69,50 @@ export default function SettingsPage() {
 
             <SettingsForm data={data} />
 
+            <DataExportPanel />
+
             <SnippetsPanel />
         </div>
+    );
+}
+
+/**
+ * Data export (T-75): downloads a JSON dump of the user's applications, cover
+ * letters, tracked jobs, and snippets — a personal backup, useful even for
+ * single-user use. Streams through the shared api client so the Sanctum session
+ * travels with the request (see downloadFile).
+ */
+function DataExportPanel() {
+    const [downloading, setDownloading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function handleExport() {
+        setError(null);
+        setDownloading(true);
+        try {
+            await downloadFile('/api/export', 'jobscope-export.json');
+        } catch {
+            setError('Could not prepare your export. Try again.');
+        } finally {
+            setDownloading(false);
+        }
+    }
+
+    return (
+        <section className="space-y-2 rounded-lg border p-4">
+            <div className="flex items-center justify-between gap-4">
+                <div>
+                    <h2 className="font-medium">Export your data</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Download a JSON backup of your applications, cover letters, tracked jobs, and snippets.
+                    </p>
+                </div>
+                <Button variant="outline" onClick={handleExport} disabled={downloading} className="shrink-0">
+                    <Download /> {downloading ? 'Preparing…' : 'Export JSON'}
+                </Button>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+        </section>
     );
 }
 

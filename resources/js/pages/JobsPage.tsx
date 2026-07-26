@@ -1,7 +1,10 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, ExternalLink, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, MapPin, SearchX, Rss } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { JobDetailDialog } from '@/components/JobDetailDialog';
 import { MatchScoreBadge } from '@/components/MatchScoreBadge';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +13,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useApplications, useCreateApplication } from '@/hooks/useApplications';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { api } from '@/lib/api';
 import { formatDate, formatSalary } from '@/lib/jobFormat';
 import { cn } from '@/lib/utils';
@@ -46,12 +52,15 @@ const REMOTE_BADGE_VARIANT: Record<RemoteType, 'default' | 'secondary' | 'outlin
 };
 
 export default function JobsPage() {
+    const navigate = useNavigate();
     const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
     const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
     const [page, setPage] = useState(1);
     const [selectedJob, setSelectedJob] = useState<JobPosting | null>(null);
+    // Keyboard-navigation cursor (T-73): index of the highlighted card in the feed.
+    const [cursor, setCursor] = useState(0);
 
-    const { data, isLoading, isError, isFetching } = useQuery({
+    const { data, isLoading, isError, isFetching, refetch } = useQuery({
         queryKey: ['jobs', appliedFilters, page],
         queryFn: async () => {
             const params: Record<string, string | number> = { per_page: PER_PAGE, page };
@@ -68,6 +77,11 @@ export default function JobsPage() {
         placeholderData: keepPreviousData,
     });
 
+    // Applications the user already tracks, so `s` (save) and `l` (open letter)
+    // map onto real pipeline actions per job.
+    const { data: applications } = useApplications();
+    const createApplication = useCreateApplication();
+
     function applyFilters(e: FormEvent) {
         e.preventDefault();
         setPage(1);
@@ -80,7 +94,7 @@ export default function JobsPage() {
         setPage(1);
     }
 
-    const jobs = data?.data ?? [];
+    const jobs = useMemo(() => data?.data ?? [], [data]);
     const total = data?.total ?? 0;
     const lastPage = data?.last_page ?? (total > 0 ? Math.ceil(total / PER_PAGE) : 1);
     const hasFilters =
@@ -92,6 +106,60 @@ export default function JobsPage() {
         appliedFilters.scoreMin !== '' ||
         appliedFilters.scoreMax !== '';
 
+    // Keep the cursor in range as the result set changes (new page/filters).
+    useEffect(() => {
+        setCursor((c) => (jobs.length === 0 ? 0 : Math.min(c, jobs.length - 1)));
+    }, [jobs]);
+
+    const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+    function moveCursor(delta: number) {
+        if (jobs.length === 0) return;
+        setCursor((c) => {
+            const next = Math.max(0, Math.min(jobs.length - 1, c + delta));
+            cardRefs.current[next]?.scrollIntoView({ block: 'nearest' });
+            return next;
+        });
+    }
+
+    /** Add the cursor's job to the pipeline, or jump to it if already tracked. */
+    function saveJob(job: JobPosting | undefined) {
+        if (!job) return;
+        const existing = applications?.find((a) => a.job_posting_id === job.id);
+        if (existing) {
+            navigate(`/applications/${existing.id}`);
+            return;
+        }
+        createApplication.mutate(
+            { job_posting_id: job.id },
+            { onSuccess: (application) => navigate(`/applications/${application.id}`) }
+        );
+    }
+
+    /** Open the tracked application's cover-letter editor for this job, if any. */
+    function openLetter(job: JobPosting | undefined) {
+        if (!job) return;
+        const existing = applications?.find((a) => a.job_posting_id === job.id);
+        if (existing) navigate(`/applications/${existing.id}/letter`);
+    }
+
+    // Feed shortcuts (T-73). Suspended while the detail dialog owns the keyboard.
+    useKeyboardShortcuts(
+        {
+            j: () => moveCursor(1),
+            k: () => moveCursor(-1),
+            o: () => setSelectedJob(jobs[cursor] ?? null),
+            Enter: () => setSelectedJob(jobs[cursor] ?? null),
+            a: () => {
+                const url = jobs[cursor]?.apply_url;
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            },
+            s: () => saveJob(jobs[cursor]),
+            l: () => openLetter(jobs[cursor]),
+        },
+        { enabled: selectedJob == null && jobs.length > 0 }
+    );
+
     return (
         <div className="min-h-screen bg-background">
             <AppNav />
@@ -100,6 +168,11 @@ export default function JobsPage() {
                     <h1 className="text-2xl font-semibold tracking-tight">Job feed</h1>
                     <p className="text-sm text-muted-foreground">
                         Jobs scraped from your sources, deduped and searchable.
+                    </p>
+                    <p className="mt-1 hidden text-xs text-muted-foreground/70 sm:block">
+                        Shortcuts: <kbd className="font-mono">j</kbd>/<kbd className="font-mono">k</kbd> move ·{' '}
+                        <kbd className="font-mono">o</kbd> open · <kbd className="font-mono">a</kbd> apply ·{' '}
+                        <kbd className="font-mono">s</kbd> save · <kbd className="font-mono">l</kbd> letter
                     </p>
                 </div>
 
@@ -203,32 +276,54 @@ export default function JobsPage() {
                 </Card>
 
                 <div className="space-y-3">
-                    {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                    {isLoading && <JobsSkeleton />}
                     {isError && (
-                        <p className="text-sm text-destructive">Could not load jobs. Try refreshing the page.</p>
+                        <ErrorState message="Could not load jobs." onRetry={() => void refetch()} />
                     )}
                     {!isLoading && !isError && jobs.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                            {hasFilters
-                                ? 'No jobs match these filters.'
-                                : 'No jobs yet — add a job source and wait for the next scrape.'}
-                        </p>
+                        <EmptyState
+                            icon={hasFilters ? SearchX : Rss}
+                            title={hasFilters ? 'No jobs match these filters' : 'No jobs yet'}
+                            description={
+                                hasFilters
+                                    ? 'Try widening your search or clearing the filters.'
+                                    : 'Add a job source and jobs will show up here after the next scrape.'
+                            }
+                            action={
+                                hasFilters ? (
+                                    <Button variant="outline" onClick={resetFilters}>
+                                        Clear filters
+                                    </Button>
+                                ) : (
+                                    <Button asChild>
+                                        <Link to="/sources">Add a job source</Link>
+                                    </Button>
+                                )
+                            }
+                        />
                     )}
 
                     {!isLoading &&
                         !isError &&
-                        jobs.map((job) => {
+                        jobs.map((job, index) => {
                             const salary = formatSalary(job);
                             const posted = formatDate(job.posted_at);
 
                             return (
                                 <Card
                                     key={job.id}
+                                    ref={(el) => {
+                                        cardRefs.current[index] = el;
+                                    }}
                                     className={cn(
                                         'cursor-pointer transition-colors hover:bg-accent/40',
+                                        index === cursor && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                                         isFetching && 'opacity-60'
                                     )}
-                                    onClick={() => setSelectedJob(job)}
+                                    onClick={() => {
+                                        setCursor(index);
+                                        setSelectedJob(job);
+                                    }}
                                 >
                                     <CardContent className="flex items-start justify-between gap-4 pt-6">
                                         <div className="min-w-0 space-y-1.5">
@@ -294,6 +389,26 @@ export default function JobsPage() {
             </div>
 
             <JobDetailDialog job={selectedJob} open={selectedJob != null} onOpenChange={(open) => !open && setSelectedJob(null)} />
+        </div>
+    );
+}
+
+/** Loading placeholder for the feed: a handful of job-card-shaped skeletons. */
+function JobsSkeleton() {
+    return (
+        <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i}>
+                    <CardContent className="flex items-start justify-between gap-4 pt-6">
+                        <div className="w-full space-y-2">
+                            <Skeleton className="h-5 w-1/2" />
+                            <Skeleton className="h-4 w-1/3" />
+                            <Skeleton className="h-3 w-2/3" />
+                        </div>
+                        <Skeleton className="h-8 w-20 shrink-0" />
+                    </CardContent>
+                </Card>
+            ))}
         </div>
     );
 }
