@@ -12,10 +12,21 @@ import type { ComponentType } from 'react';
 import { Link } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
 import { EmptyState } from '@/components/EmptyState';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAiUsage } from '@/hooks/useProfile';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useApplications } from '@/hooks/useApplications';
+import { useFollowUps } from '@/hooks/useFollowUps';
+import { useJobSourcesCount } from '@/hooks/useJobSourcesCount';
+import { useJobsCount } from '@/hooks/useJobsCount';
 import { useAuthStore } from '@/store/useAuthStore';
+
+/** Format cents as a dollar string, mirroring the Settings page. */
+function dollars(cents: number): string {
+    return `$${(cents / 100).toFixed(2)}`;
+}
 
 /** Format a 0–1 rate as a whole percentage, or an em dash when there's no data. */
 function pct(rate: number | null | undefined): string {
@@ -69,13 +80,41 @@ const QUICK_LINKS: {
 /**
  * Dashboard for the authenticated SPA (T-70 polish). Opens with a headline
  * stat row read live from the analytics endpoint, then quick-link cards into
- * every major screen.
+ * every major screen — each showing its own live count pulled from the API.
  */
 export default function HomePage() {
     const user = useAuthStore((s) => s.user);
     const { data, isLoading } = useAnalytics();
     const totals = data?.data.totals;
     const hasData = (totals?.applied ?? 0) > 0;
+
+    const jobs = useJobsCount();
+    const applications = useApplications();
+    const followUps = useFollowUps();
+    const sources = useJobSourcesCount();
+    const usage = useAiUsage();
+
+    /** Per-section headline stat shown on each quick-link card, keyed by route. */
+    const cardStats: Record<string, { value: string | number; label: string; loading: boolean }> = {
+        '/jobs': { value: jobs.data ?? 0, label: 'jobs', loading: jobs.isLoading },
+        '/applications': {
+            value: applications.data?.length ?? 0,
+            label: 'in pipeline',
+            loading: applications.isLoading,
+        },
+        '/insights': { value: pct(totals?.response_rate), label: 'response rate', loading: isLoading },
+        '/follow-ups': {
+            value: followUps.data?.length ?? 0,
+            label: 'pending',
+            loading: followUps.isLoading,
+        },
+        '/sources': { value: sources.data ?? 0, label: 'sources', loading: sources.isLoading },
+        '/settings': {
+            value: usage.data ? dollars(usage.data.week.spent_cents) : '—',
+            label: 'AI spend this week',
+            loading: usage.isLoading,
+        },
+    };
 
     return (
         <div className="min-h-screen bg-background">
@@ -85,10 +124,10 @@ export default function HomePage() {
                     <h1 className="text-3xl font-semibold tracking-tight">
                         {user?.name ? `Welcome back, ${user.name.split(' ')[0]}` : 'JobScope'}
                     </h1>
-                    <p className="text-sm text-muted-foreground">
-                        {user?.email}
-                        {user?.is_admin ? ' · admin' : ''}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-muted-foreground">{user?.email}</p>
+                        {user?.is_admin && <Badge variant="secondary">Admin</Badge>}
+                    </div>
                 </div>
 
                 {isLoading ? (
@@ -125,22 +164,39 @@ export default function HomePage() {
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {QUICK_LINKS.map(({ to, label, description, icon: Icon }) => (
-                        <Link key={to} to={to} className="group">
-                            <Card className="h-full transition-colors group-hover:bg-accent">
-                                <CardHeader>
-                                    <div className="mb-1 flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                                        <Icon className="size-5" />
-                                    </div>
-                                    <CardTitle className="flex items-center justify-between">
-                                        {label}
-                                        <ArrowRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                                    </CardTitle>
-                                    <CardDescription>{description}</CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </Link>
-                    ))}
+                    {QUICK_LINKS.map(({ to, label, description, icon: Icon }) => {
+                        const stat = cardStats[to];
+                        return (
+                            <Link key={to} to={to} className="group">
+                                <Card className="h-full transition-colors group-hover:bg-accent">
+                                    <CardHeader>
+                                        <div className="mb-1 flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                            <Icon className="size-5" />
+                                        </div>
+                                        <CardTitle className="flex items-center justify-between">
+                                            {label}
+                                            <ArrowRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                        </CardTitle>
+                                        {stat && (
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className="text-xl font-semibold tabular-nums">
+                                                    {stat.loading ? (
+                                                        <span className="text-muted-foreground/40">—</span>
+                                                    ) : (
+                                                        stat.value
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {stat.label}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <CardDescription>{description}</CardDescription>
+                                    </CardHeader>
+                                </Card>
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
         </div>
