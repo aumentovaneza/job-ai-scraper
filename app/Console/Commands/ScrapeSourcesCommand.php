@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\ScrapeAtsFeedJob;
 use App\Jobs\ScrapeCareerPageJob;
+use App\Jobs\ScrapeJsonApiJob;
 use App\Models\JobSource;
 use Cron\CronExpression;
 use Illuminate\Console\Command;
@@ -73,6 +74,7 @@ class ScrapeSourcesCommand extends Command
         return match ($source->type) {
             'ats_feed' => tap(true, fn () => ScrapeAtsFeedJob::dispatch($source->id)),
             'career_page' => tap(true, fn () => ScrapeCareerPageJob::dispatch($source->id)),
+            'json_api' => tap(true, fn () => ScrapeJsonApiJob::dispatch($source->id)),
             default => tap(false, fn () => $this->warn("Source #{$source->id} has unsupported type '{$source->type}', skipping.")),
         };
     }

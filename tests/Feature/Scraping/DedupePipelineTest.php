@@ -51,6 +51,20 @@ it('creates a canonical posting and a source hit for a new job', function () {
     Queue::assertPushed(EmbedJobPostingJob::class, 1);
 });
 
+it('persists tags onto the canonical posting', function () {
+    Queue::fake();
+    $source = greenhouseSource();
+
+    runDedupe(new NormalizedJob(
+        title: 'Senior Go Engineer',
+        company: 'Acme',
+        location: 'Remote',
+        tags: ['golang', 'backend'],
+    ), $source);
+
+    expect(JobPosting::first()->tags)->toBe(['golang', 'backend']);
+});
+
 it('is idempotent: the same job twice yields one posting and one hit', function () {
     Queue::fake();
     $source = greenhouseSource();

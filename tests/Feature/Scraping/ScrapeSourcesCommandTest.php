@@ -2,6 +2,7 @@
 
 use App\Jobs\ScrapeAtsFeedJob;
 use App\Jobs\ScrapeCareerPageJob;
+use App\Jobs\ScrapeJsonApiJob;
 use App\Models\JobSource;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -22,6 +23,17 @@ it('dispatches a job for a due ATS source', function () {
     $this->artisan('scrape:sources')->assertSuccessful();
 
     Queue::assertPushed(ScrapeAtsFeedJob::class, 1);
+});
+
+it('dispatches a job for a due json_api source', function () {
+    Queue::fake();
+    source(['type' => 'json_api', 'active' => true, 'cron_schedule' => '* * * * *',
+        'url' => 'https://remoteok.com/api',
+        'config' => ['field_map' => ['title' => 'position', 'company' => 'company']]]);
+
+    $this->artisan('scrape:sources')->assertSuccessful();
+
+    Queue::assertPushed(ScrapeJsonApiJob::class, 1);
 });
 
 it('skips a source whose cron is not due', function () {

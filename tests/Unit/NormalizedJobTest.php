@@ -36,10 +36,19 @@ it('round-trips through array form', function () {
         applyUrl: 'https://acme.test/1',
         postedAt: '2026-06-01T00:00:00+00:00',
         sourceUrl: 'https://acme.test/1',
+        tags: ['go', 'backend'],
     );
 
     $restored = NormalizedJob::fromArray($job->toArray());
 
     expect($restored->toArray())->toBe($job->toArray());
+    expect($restored->tags)->toBe(['go', 'backend']);
     expect($restored->sourceHash())->toBe($job->sourceHash());
+});
+
+it('defaults tags to an empty array when absent from the array form', function () {
+    // Pre-upgrade queue payloads carry no `tags` key.
+    $restored = NormalizedJob::fromArray(['title' => 'Engineer', 'company' => 'Acme']);
+
+    expect($restored->tags)->toBe([]);
 });

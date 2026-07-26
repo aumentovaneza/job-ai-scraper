@@ -27,7 +27,7 @@ class JobPostingController extends Controller
             unset($filters['source_id']);
         }
 
-        $jobs = $this->search->search($filters)
+        $jobs = $this->search->search($filters, $request->user())
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
 

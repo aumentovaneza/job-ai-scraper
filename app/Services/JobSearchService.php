@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\JobPosting;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -21,10 +22,15 @@ use Illuminate\Support\Facades\DB;
  *   - remote_type  string  remote | hybrid | onsite
  *   - salary_min   int     postings whose upper salary band is at least this
  *   - posted_after string  ISO date/datetime; postings posted on/after this
+ *
+ * When a $user is supplied, results are additionally ordered so postings whose
+ * only surfacing sources are low-acceptability (won't hire internationally /
+ * demand timezone overlap) sink to the bottom — a source-level downrank so the
+ * matcher isn't spent on jobs the user can't accept.
  */
 class JobSearchService
 {
-    public function search(array $filters = []): Builder
+    public function search(array $filters = [], ?User $user = null): Builder
     {
         $query = JobPosting::query();
 
@@ -32,7 +38,7 @@ class JobSearchService
         $ranked = false;
 
         if ($term !== '') {
-            $ranked = $this->applyTextSearch($query, $term);
+            $ranked = $this->applyTextPredicate($query, $term);
         }
 
         if (! empty($filters['source_id'])) {
@@ -54,8 +60,15 @@ class JobSearchService
             $query->where('posted_at', '>=', $filters['posted_after']);
         }
 
-        // Ranked results already carry a relevance order; otherwise newest first.
-        if (! $ranked) {
+        // Leading sort: source-level acceptability (acceptable buckets first),
+        // then relevance / recency within each bucket.
+        if ($user !== null) {
+            $this->applyAcceptabilityOrder($query, $user);
+        }
+
+        if ($ranked) {
+            $this->applyTextOrder($query, $term);
+        } else {
             $query->orderByDesc('posted_at')->orderByDesc('id');
         }
 
@@ -63,16 +76,14 @@ class JobSearchService
     }
 
     /**
-     * Apply the free-text predicate. Returns true when the query is already
-     * ordered by relevance (Postgres path), false when the caller should fall
-     * back to a recency ordering.
+     * Apply the free-text predicate. Returns true on Postgres (where a separate
+     * ts_rank ordering is available), false when the caller should fall back to
+     * a recency ordering.
      */
-    protected function applyTextSearch(Builder $query, string $term): bool
+    protected function applyTextPredicate(Builder $query, string $term): bool
     {
         if (DB::connection()->getDriverName() === 'pgsql') {
-            $query
-                ->whereRaw("search_vector @@ plainto_tsquery('english', ?)", [$term])
-                ->orderByRaw("ts_rank(search_vector, plainto_tsquery('english', ?)) DESC", [$term]);
+            $query->whereRaw("search_vector @@ plainto_tsquery('english', ?)", [$term]);
 
             return true;
         }
@@ -87,6 +98,36 @@ class JobSearchService
         });
 
         return false;
+    }
+
+    /** Order by Postgres full-text relevance (only valid on the pgsql path). */
+    protected function applyTextOrder(Builder $query, string $term): void
+    {
+        $query->orderByRaw("ts_rank(search_vector, plainto_tsquery('english', ?)) DESC", [$term]);
+    }
+
+    /**
+     * Downrank by source acceptability. A posting's penalty is the MIN over the
+     * user's own sources that surfaced it (the best source wins); postings not
+     * linked to any of the user's sources score 0 (neutral). Mirrors
+     * JobSource::acceptabilityPenalty() in SQL and is portable across pgsql
+     * (boolean column) and the sqlite test path (0/1).
+     */
+    protected function applyAcceptabilityOrder(Builder $query, User $user): void
+    {
+        $penalty = <<<'SQL'
+            coalesce((
+                select min(
+                    (case when js.hires_internationally then 0 else 2 end)
+                    + (case js.timezone_overlap when 'strict' then 2 when 'partial' then 1 else 0 end)
+                )
+                from job_source_hits jsh
+                join job_sources js on js.id = jsh.job_source_id
+                where jsh.job_posting_id = job_postings.id and js.user_id = ?
+            ), 0) asc
+        SQL;
+
+        $query->orderByRaw($penalty, [$user->id]);
     }
 
     protected function escapeLike(string $value): string

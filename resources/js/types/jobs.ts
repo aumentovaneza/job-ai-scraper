@@ -12,13 +12,23 @@ export interface Paginated<T> {
     total: number;
 }
 
-export type JobSourceType = 'ats_feed' | 'career_page' | 'rss';
+export type JobSourceType = 'ats_feed' | 'career_page' | 'rss' | 'json_api';
 export type AtsProvider = 'greenhouse' | 'lever' | 'workable' | 'ashby';
 export type RemoteType = 'remote' | 'hybrid' | 'onsite';
+export type TimezoneOverlap = 'any' | 'partial' | 'strict';
+
+/** A field_map value: a single dot-path or a list of candidate paths. */
+export type FieldMapValue = string | string[];
 
 export interface JobSourceConfig {
     provider?: AtsProvider;
     board_token?: string;
+    /** json_api: dot-path to the array of items (null/omitted = body is the array). */
+    items_path?: string | null;
+    /** json_api: request headers to merge (e.g. a User-Agent). */
+    headers?: Record<string, string>;
+    /** json_api: target NormalizedJob field => source dot-path(s). */
+    field_map?: Record<string, FieldMapValue>;
 }
 
 export interface JobSource {
@@ -28,6 +38,8 @@ export interface JobSource {
     config: JobSourceConfig | null;
     cron_schedule: string | null;
     active: boolean;
+    hires_internationally: boolean;
+    timezone_overlap: TimezoneOverlap | null;
     last_scraped_at: string | null;
     created_at: string;
 }
@@ -44,6 +56,7 @@ export interface NormalizedJob {
     apply_url: string | null;
     posted_at: string | null;
     source_url: string | null;
+    tags: string[];
 }
 
 export interface JobPosting {
@@ -58,6 +71,7 @@ export interface JobPosting {
     jd_text: string | null;
     apply_url: string | null;
     posted_at: string | null;
+    tags: string[] | null;
     first_seen_at: string | null;
     last_seen_at: string | null;
     created_at: string;

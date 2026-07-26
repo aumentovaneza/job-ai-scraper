@@ -2,13 +2,17 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidatesJobSourceConfig;
 use App\Models\JobSource;
 use Cron\CronExpression;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreJobSourceRequest extends FormRequest
 {
+    use ValidatesJobSourceConfig;
+
     public function authorize(): bool
     {
         return $this->user()->can('create', JobSource::class);
@@ -17,10 +21,11 @@ class StoreJobSourceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', Rule::in(['ats_feed', 'career_page', 'rss'])],
+            'type' => ['required', Rule::in(['ats_feed', 'career_page', 'rss', 'json_api'])],
 
             // ATS feeds are addressed by provider + board token; the human-facing
-            // board URL is optional. Career pages / RSS need a real URL to fetch.
+            // board URL is optional. Career pages / RSS / JSON APIs need a real
+            // URL to fetch.
             'url' => ['nullable', 'required_unless:type,ats_feed', 'url', 'max:2048'],
 
             'config' => ['nullable', 'array'],
@@ -34,7 +39,14 @@ class StoreJobSourceRequest extends FormRequest
 
             'cron_schedule' => ['nullable', 'string', 'max:255', $this->cronRule()],
             'active' => ['boolean'],
+
+            ...$this->sharedConfigRules(),
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(fn (Validator $v) => $this->validateJsonApiConfig($v));
     }
 
     /**
