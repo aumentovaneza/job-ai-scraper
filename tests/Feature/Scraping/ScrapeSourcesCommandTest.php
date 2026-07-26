@@ -2,6 +2,7 @@
 
 use App\Jobs\ScrapeAtsFeedJob;
 use App\Jobs\ScrapeCareerPageJob;
+use App\Jobs\ScrapeRssJob;
 use App\Models\JobSource;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -22,6 +23,16 @@ it('dispatches a job for a due ATS source', function () {
     $this->artisan('scrape:sources')->assertSuccessful();
 
     Queue::assertPushed(ScrapeAtsFeedJob::class, 1);
+});
+
+it('dispatches a job for a due RSS source', function () {
+    Queue::fake();
+    source(['type' => 'rss', 'active' => true, 'cron_schedule' => '* * * * *',
+        'url' => 'https://jobs.test/feed.xml']);
+
+    $this->artisan('scrape:sources')->assertSuccessful();
+
+    Queue::assertPushed(ScrapeRssJob::class, 1);
 });
 
 it('skips a source whose cron is not due', function () {
