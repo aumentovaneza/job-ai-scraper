@@ -29,7 +29,8 @@ class JobPostingController extends Controller
 
         // Attach the caller's own fit score to each posting (T-32/T-33). The
         // MatchScore BelongsToUser scope keeps this to the current user's rows.
-        $jobs = $this->search->search($filters)
+        // Passing the user also lets the search downrank low-acceptability sources.
+        $jobs = $this->search->search($filters, $request->user())
             ->with('matchScore')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();

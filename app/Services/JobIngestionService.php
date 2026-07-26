@@ -77,6 +77,7 @@ class JobIngestionService
             'jd_html_snapshot' => $job->jdHtmlSnapshot,
             'apply_url' => $job->applyUrl,
             'posted_at' => $job->postedAt,
+            'tags' => $job->tags ?: null,
             'raw_extract' => $job->rawExtract ?: null,
         ];
     }

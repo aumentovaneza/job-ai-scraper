@@ -30,6 +30,8 @@ final class NormalizedJob implements Arrayable
         public readonly ?string $applyUrl = null,
         public readonly ?string $postedAt = null,
         public readonly ?string $sourceUrl = null,
+        /** @var array<int, string> */
+        public readonly array $tags = [],
         /** @var array<string, mixed> */
         public readonly array $rawExtract = [],
     ) {}
@@ -55,6 +57,7 @@ final class NormalizedJob implements Arrayable
             applyUrl: $data['apply_url'] ?? null,
             postedAt: $data['posted_at'] ?? null,
             sourceUrl: $data['source_url'] ?? null,
+            tags: $data['tags'] ?? [],
             rawExtract: $data['raw_extract'] ?? [],
         );
     }
@@ -77,6 +80,7 @@ final class NormalizedJob implements Arrayable
             'apply_url' => $this->applyUrl,
             'posted_at' => $this->postedAt,
             'source_url' => $this->sourceUrl,
+            'tags' => $this->tags,
             'raw_extract' => $this->rawExtract,
         ];
     }

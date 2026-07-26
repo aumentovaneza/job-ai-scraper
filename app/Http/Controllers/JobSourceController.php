@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateJobSourceRequest;
 use App\Models\JobSource;
 use App\Services\Ats\AtsFeedScraper;
 use App\Services\CareerPageScraper;
+use App\Services\JsonApi\JsonApiScraper;
 use App\Services\RssFeedScraper;
 use App\Support\NormalizedJob;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +29,7 @@ class JobSourceController extends Controller
     public function __construct(
         private readonly AtsFeedScraper $atsScraper,
         private readonly CareerPageScraper $careerScraper,
+        private readonly JsonApiScraper $jsonApiScraper,
         private readonly RssFeedScraper $rssScraper,
     ) {}
 
@@ -77,6 +79,7 @@ class JobSourceController extends Controller
             $postings = match ($jobSource->type) {
                 'ats_feed' => $this->atsScraper->scrape($jobSource),
                 'career_page' => $this->careerScrape($jobSource),
+                'json_api' => $this->jsonApiScraper->scrape($jobSource, JsonApiScraper::PREVIEW_TIMEOUT),
                 'rss' => $this->rssScraper->scrape($jobSource),
                 default => throw new \RuntimeException("Test scrape is not supported for '{$jobSource->type}' sources yet."),
             };

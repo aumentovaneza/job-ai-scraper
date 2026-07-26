@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'source_hash', 'title', 'company', 'location', 'remote_type',
     'salary_min', 'salary_max', 'salary_currency', 'jd_text', 'jd_html_snapshot',
-    'apply_url', 'posted_at', 'first_seen_at', 'last_seen_at', 'raw_extract', 'enrichment',
+    'apply_url', 'posted_at', 'first_seen_at', 'last_seen_at', 'raw_extract', 'enrichment', 'tags',
 ])]
 class JobPosting extends Model
 {
@@ -32,6 +32,7 @@ class JobPosting extends Model
             'last_seen_at' => 'datetime',
             'raw_extract' => 'array',
             'enrichment' => 'array',
+            'tags' => 'array',
         ];
     }
 

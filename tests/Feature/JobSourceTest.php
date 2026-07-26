@@ -104,6 +104,149 @@ it('deletes a source it owns', function () {
     $this->assertDatabaseMissing('job_sources', ['id' => $source->id]);
 });
 
+// --- JSON API source type ---------------------------------------------------
+
+it('creates a json_api source with a field map', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+
+    $payload = [
+        'type' => 'json_api',
+        'url' => 'https://remoteok.com/api',
+        'config' => [
+            'items_path' => null,
+            'headers' => ['User-Agent' => 'JobScraper/1.0'],
+            'field_map' => ['title' => 'position', 'company' => 'company', 'tags' => 'tags'],
+        ],
+        'active' => true,
+    ];
+
+    $response = statefulJson()->postJson('/api/job-sources', $payload)->assertCreated();
+
+    expect($response->json('data.type'))->toBe('json_api');
+    expect($response->json('data.config.field_map.title'))->toBe('position');
+});
+
+it('rejects a json_api source without a field map', function () {
+    actingAs(User::factory()->create());
+
+    statefulJson()->postJson('/api/job-sources', [
+        'type' => 'json_api',
+        'url' => 'https://remoteok.com/api',
+        'config' => ['items_path' => null],
+    ])->assertStatus(422)->assertJsonValidationErrors('config.field_map');
+});
+
+it('rejects a json_api field map missing title/company', function () {
+    actingAs(User::factory()->create());
+
+    statefulJson()->postJson('/api/job-sources', [
+        'type' => 'json_api',
+        'url' => 'https://remoteok.com/api',
+        'config' => ['field_map' => ['location' => 'location']],
+    ])->assertStatus(422)->assertJsonValidationErrors(['config.field_map.title', 'config.field_map.company']);
+});
+
+it('rejects an unknown field map target', function () {
+    actingAs(User::factory()->create());
+
+    statefulJson()->postJson('/api/job-sources', [
+        'type' => 'json_api',
+        'url' => 'https://remoteok.com/api',
+        'config' => ['field_map' => ['title' => 'position', 'company' => 'company', 'nonsense' => 'x']],
+    ])->assertStatus(422)->assertJsonValidationErrors('config.field_map.nonsense');
+});
+
+it('requires a url for a json_api source', function () {
+    actingAs(User::factory()->create());
+
+    statefulJson()->postJson('/api/job-sources', [
+        'type' => 'json_api',
+        'config' => ['field_map' => ['title' => 'position', 'company' => 'company']],
+    ])->assertStatus(422)->assertJsonValidationErrors('url');
+});
+
+it('allows toggling active on a json_api source without resending config', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+    $source = JobSource::factory()->create([
+        'user_id' => $me->id,
+        'type' => 'json_api',
+        'url' => 'https://remoteok.com/api',
+        'config' => ['field_map' => ['title' => 'position', 'company' => 'company']],
+        'active' => true,
+    ]);
+
+    // Partial PATCH omits `type`, so the json_api field-map rules must not fire.
+    statefulJson()->patchJson("/api/job-sources/{$source->id}", ['active' => false])
+        ->assertOk()
+        ->assertJsonPath('data.active', false);
+});
+
+it('test-scrapes a json_api source without persisting', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+
+    $source = JobSource::factory()->create([
+        'user_id' => $me->id,
+        'type' => 'json_api',
+        'url' => 'https://remoteok.com/api',
+        'config' => [
+            'items_path' => 'jobs',
+            'field_map' => [
+                'title' => 'position',
+                'company' => 'company',
+                'tags' => 'tags',
+            ],
+        ],
+    ]);
+
+    Http::fake([
+        'remoteok.com/*' => Http::response([
+            'jobs' => [[
+                'position' => 'Staff Engineer',
+                'company' => 'Acme',
+                'tags' => ['go', 'remote'],
+            ]],
+        ]),
+    ]);
+
+    $response = statefulJson()->postJson("/api/job-sources/{$source->id}/test-scrape")->assertOk();
+
+    expect($response->json('count'))->toBe(1);
+    expect($response->json('jobs.0.title'))->toBe('Staff Engineer');
+    expect($response->json('jobs.0.tags'))->toBe(['go', 'remote']);
+
+    $this->assertDatabaseCount('job_postings', 0);
+});
+
+// --- Acceptability flags ----------------------------------------------------
+
+it('stores the source-level acceptability flags', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+
+    $response = statefulJson()->postJson('/api/job-sources', [
+        'type' => 'ats_feed',
+        'config' => ['provider' => 'greenhouse', 'board_token' => 'acme'],
+        'hires_internationally' => false,
+        'timezone_overlap' => 'strict',
+    ])->assertCreated();
+
+    expect($response->json('data.hires_internationally'))->toBeFalse();
+    expect($response->json('data.timezone_overlap'))->toBe('strict');
+});
+
+it('rejects an invalid timezone_overlap value', function () {
+    actingAs(User::factory()->create());
+
+    statefulJson()->postJson('/api/job-sources', [
+        'type' => 'ats_feed',
+        'config' => ['provider' => 'greenhouse', 'board_token' => 'acme'],
+        'timezone_overlap' => 'sometimes',
+    ])->assertStatus(422)->assertJsonValidationErrors('timezone_overlap');
+});
+
 // --- Multi-tenant isolation (mandatory per PLAN.md §7) ----------------------
 
 it('cannot view another user\'s source via update/delete (404 from scope)', function () {
