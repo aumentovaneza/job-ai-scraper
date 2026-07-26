@@ -46,6 +46,41 @@ export interface NormalizedJob {
     source_url: string | null;
 }
 
+export interface SalaryBand {
+    min: number | null;
+    max: number | null;
+    currency: string | null;
+    period: string | null;
+}
+
+/**
+ * AI-extracted structured data about a job posting (T-31 `EnrichJobJob`).
+ * `null` until the job has been enriched.
+ */
+export interface JobEnrichment {
+    required_skills?: string[];
+    nice_to_have_skills?: string[];
+    seniority?: string;
+    remote_type?: string;
+    salary_band?: SalaryBand;
+    red_flags?: string[];
+    one_line_summary?: string;
+    prompt_version?: string;
+    generated_at?: string;
+}
+
+/**
+ * The current user's fit score + reasoning for a job (T-32 `MatchJobToProfileJob`).
+ * `null` until a score has been computed for the current user.
+ */
+export interface JobMatchScore {
+    score: number | null;
+    reasoning: string | null;
+    strengths: string[] | null;
+    gaps: string[] | null;
+    computed_at: string | null;
+}
+
 export interface JobPosting {
     id: number;
     title: string;
@@ -61,4 +96,6 @@ export interface JobPosting {
     first_seen_at: string | null;
     last_seen_at: string | null;
     created_at: string;
+    enrichment: JobEnrichment | null;
+    match_score: JobMatchScore | null;
 }

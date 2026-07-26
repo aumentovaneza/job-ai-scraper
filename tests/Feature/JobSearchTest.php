@@ -3,6 +3,7 @@
 use App\Models\JobPosting;
 use App\Models\JobSource;
 use App\Models\JobSourceHit;
+use App\Models\MatchScore;
 use App\Models\User;
 
 use function Pest\Laravel\actingAs;
@@ -89,4 +90,38 @@ it('ignores a source_id that belongs to another user', function () {
     $response = statefulGetJson("/api/jobs?source_id={$otherSource->id}")->assertOk();
 
     expect($response->json('total'))->toBe(2);
+});
+
+it('attaches only the current user\'s match score to each posting (T-32)', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create();
+    $posting = JobPosting::factory()->create();
+
+    // My score should surface; the other user's score for the same posting must not.
+    MatchScore::withoutGlobalScopes()->create([
+        'user_id' => $me->id, 'job_posting_id' => $posting->id,
+        'score' => 82, 'reasoning' => 'Good fit', 'strengths' => ['x'], 'gaps' => [],
+        'prompt_version' => 'match_score.v1', 'input_hash' => 'abc', 'computed_at' => now(),
+    ]);
+    MatchScore::withoutGlobalScopes()->create([
+        'user_id' => $other->id, 'job_posting_id' => $posting->id,
+        'score' => 10, 'reasoning' => 'Weak', 'strengths' => [], 'gaps' => ['y'],
+        'prompt_version' => 'match_score.v1', 'input_hash' => 'def', 'computed_at' => now(),
+    ]);
+
+    actingAs($me);
+    $response = statefulGetJson('/api/jobs')->assertOk();
+
+    expect($response->json('data.0.match_score.score'))->toBe(82);
+    // The internal cache fingerprint is never exposed.
+    expect($response->json('data.0.match_score'))->not->toHaveKey('input_hash');
+});
+
+it('returns a null match score for a posting the user has not been scored on', function () {
+    actingAs(User::factory()->create());
+    JobPosting::factory()->create();
+
+    $response = statefulGetJson('/api/jobs')->assertOk();
+
+    expect($response->json('data.0.match_score'))->toBeNull();
 });
