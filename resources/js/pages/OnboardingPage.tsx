@@ -4,6 +4,7 @@ import { AxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { AiKeyPanel } from '@/components/AiKeyPanel';
 import { ProviderToggle } from '@/components/ProviderToggle';
@@ -38,8 +39,14 @@ export default function OnboardingPage() {
 
     if (isLoading || !data) {
         return (
-            <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-                Loading…
+            <div className="mx-auto max-w-xl space-y-6 p-8">
+                <Skeleton className="h-8 w-40" />
+                <div className="flex gap-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-6 w-24" />
+                    ))}
+                </div>
+                <Skeleton className="h-64 w-full" />
             </div>
         );
     }

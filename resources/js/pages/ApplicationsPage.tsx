@@ -8,10 +8,14 @@ import {
     useSensors,
     type DragEndEvent,
 } from '@dnd-kit/core';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, LayoutList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { MatchScoreBadge } from '@/components/MatchScoreBadge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useApplications, useApplicationStages, useMoveApplication } from '@/hooks/useApplications';
 import { cn } from '@/lib/utils';
 import type { Application, ApplicationStage } from '@/types/applications';
@@ -83,19 +87,33 @@ export default function ApplicationsPage() {
 
                 {moveError && <p className="text-sm text-destructive">{moveError}</p>}
 
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                {isLoading && <KanbanSkeleton />}
                 {isError && (
-                    <p className="text-sm text-destructive">Could not load your pipeline. Try refreshing the page.</p>
+                    <ErrorState
+                        message="Could not load your pipeline."
+                        onRetry={() => {
+                            void stagesQuery.refetch();
+                            void appsQuery.refetch();
+                        }}
+                    />
                 )}
 
                 {!isLoading && !isError && totalApps === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                        No applications yet — open a job from the{' '}
-                        <Link to="/jobs" className="underline underline-offset-4">
-                            feed
-                        </Link>{' '}
-                        and start tracking it.
-                    </p>
+                    <EmptyState
+                        icon={LayoutList}
+                        title="No applications yet"
+                        description={
+                            <>
+                                Open a job from the feed and start tracking it — moves between stages will show up
+                                here.
+                            </>
+                        }
+                        action={
+                            <Button asChild>
+                                <Link to="/jobs">Browse jobs</Link>
+                            </Button>
+                        }
+                    />
                 )}
 
                 {!isLoading && !isError && stages.length > 0 && (
@@ -108,6 +126,23 @@ export default function ApplicationsPage() {
                     </DndContext>
                 )}
             </div>
+        </div>
+    );
+}
+
+function KanbanSkeleton() {
+    return (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex w-72 shrink-0 flex-col gap-2">
+                    <Skeleton className="mb-1 h-4 w-24" />
+                    <div className="flex flex-1 flex-col gap-2 rounded-lg border border-dashed p-2">
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
