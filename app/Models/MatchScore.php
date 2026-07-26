@@ -9,11 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'user_id', 'job_posting_id', 'score', 'reasoning',
-    'strengths', 'gaps', 'computed_at', 'prompt_version',
+    'strengths', 'gaps', 'computed_at', 'prompt_version', 'input_hash',
 ])]
 class MatchScore extends Model
 {
     use BelongsToUser;
+
+    /** input_hash is an internal cache fingerprint; never surface it via the API. */
+    protected $hidden = ['input_hash'];
 
     protected function casts(): array
     {

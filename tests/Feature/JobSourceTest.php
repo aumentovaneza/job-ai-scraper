@@ -309,3 +309,97 @@ it('test-scrapes a greenhouse source without persisting', function () {
     // Nothing persisted — test scrape is a pure preview.
     $this->assertDatabaseCount('job_postings', 0);
 });
+
+it('test-scrapes an RSS 2.0 feed without persisting', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+
+    $source = JobSource::factory()->create([
+        'user_id' => $me->id,
+        'type' => 'rss',
+        'url' => 'https://jobs.test/feed.xml',
+        'config' => ['company' => 'Acme'],
+    ]);
+
+    Http::fake([
+        'jobs.test/*' => Http::response(<<<'XML'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0">
+          <channel>
+            <title>Acme Jobs</title>
+            <item>
+              <title>Senior Remote Engineer</title>
+              <link>https://jobs.test/roles/1</link>
+              <description>&lt;p&gt;Build remote things.&lt;/p&gt;</description>
+              <pubDate>Wed, 01 Jul 2026 00:00:00 +0000</pubDate>
+            </item>
+          </channel>
+        </rss>
+        XML, 200, ['Content-Type' => 'application/rss+xml']),
+    ]);
+
+    $response = statefulJson()->postJson("/api/job-sources/{$source->id}/test-scrape")->assertOk();
+
+    expect($response->json('count'))->toBe(1);
+    expect($response->json('jobs.0.title'))->toBe('Senior Remote Engineer');
+    expect($response->json('jobs.0.company'))->toBe('Acme');
+    expect($response->json('jobs.0.apply_url'))->toBe('https://jobs.test/roles/1');
+    expect($response->json('jobs.0.remote_type'))->toBe('remote');
+    expect($response->json('jobs.0.jd_text'))->toContain('Build remote things');
+
+    $this->assertDatabaseCount('job_postings', 0);
+});
+
+it('test-scrapes an Atom feed without persisting', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+
+    $source = JobSource::factory()->create([
+        'user_id' => $me->id,
+        'type' => 'rss',
+        'url' => 'https://atom.test/feed',
+        'config' => [],
+    ]);
+
+    Http::fake([
+        'atom.test/*' => Http::response(<<<'XML'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Atom Jobs</title>
+          <entry>
+            <title>Platform Engineer</title>
+            <link rel="alternate" href="https://atom.test/roles/9"/>
+            <summary>Own the platform.</summary>
+            <published>2026-07-02T00:00:00Z</published>
+          </entry>
+        </feed>
+        XML, 200, ['Content-Type' => 'application/atom+xml']),
+    ]);
+
+    $response = statefulJson()->postJson("/api/job-sources/{$source->id}/test-scrape")->assertOk();
+
+    expect($response->json('count'))->toBe(1);
+    expect($response->json('jobs.0.title'))->toBe('Platform Engineer');
+    // No config company / feed title falls back to feed <title>.
+    expect($response->json('jobs.0.company'))->toBe('Atom Jobs');
+    expect($response->json('jobs.0.apply_url'))->toBe('https://atom.test/roles/9');
+
+    $this->assertDatabaseCount('job_postings', 0);
+});
+
+it('returns a 422 when an RSS feed is not valid XML', function () {
+    $me = User::factory()->create();
+    actingAs($me);
+
+    $source = JobSource::factory()->create([
+        'user_id' => $me->id,
+        'type' => 'rss',
+        'url' => 'https://broken.test/feed',
+    ]);
+
+    Http::fake(['broken.test/*' => Http::response('not xml at all', 200)]);
+
+    statefulJson()->postJson("/api/job-sources/{$source->id}/test-scrape")
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'RSS feed https://broken.test/feed did not return valid XML.');
+});
