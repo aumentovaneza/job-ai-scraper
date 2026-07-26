@@ -5,12 +5,15 @@ use App\Http\Controllers\AiUsageController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\ApplicationStageController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\CoverLetterController;
+use App\Http\Controllers\CoverLetterExportController;
 use App\Http\Controllers\FollowUpController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\JobPostingController;
 use App\Http\Controllers\JobSourceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SnippetController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth endpoint. SPA calls /sanctum/csrf-cookie first, then /login.
@@ -58,6 +61,22 @@ Route::middleware('auth:sanctum')->group(function () {
     // Follow-up inbox: review AI-drafted nudges, mark sent/dismissed (T-45).
     Route::get('/follow-ups', [FollowUpController::class, 'index']);
     Route::patch('/follow-ups/{followUp}', [FollowUpController::class, 'update']);
+
+    // Cover letters (T-52/T-55/T-56). Generation fans out on the ai queue; the
+    // paragraph rewrite is a small synchronous Claude call. User-scoped via the
+    // BelongsToUser scope + Application/CoverLetter/CoverLetterVersion policies.
+    Route::get('/applications/{application}/cover-letter', [CoverLetterController::class, 'show']);
+    Route::post('/applications/{application}/cover-letter/generate', [CoverLetterController::class, 'generate']);
+    Route::patch('/cover-letters/{coverLetter}/active-version', [CoverLetterController::class, 'setActiveVersion']);
+    Route::post('/cover-letters/{coverLetter}/regenerate-paragraph', [CoverLetterController::class, 'regenerateParagraph']);
+    Route::patch('/cover-letter-versions/{version}', [CoverLetterController::class, 'updateVersion']);
+    Route::get('/cover-letter-versions/{version}/export', [CoverLetterExportController::class, 'export']);
+
+    // Reusable letter snippet library (T-54). User-scoped CRUD.
+    Route::get('/snippets', [SnippetController::class, 'index']);
+    Route::post('/snippets', [SnippetController::class, 'store']);
+    Route::patch('/snippets/{snippet}', [SnippetController::class, 'update']);
+    Route::delete('/snippets/{snippet}', [SnippetController::class, 'destroy']);
 
     // BYOK: per-user AI key management for each provider (T-10).
     Route::get('/ai-key', [AiKeyController::class, 'show']);

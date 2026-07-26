@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AiKeyPanel } from '@/components/AiKeyPanel';
 import { ProviderToggle } from '@/components/ProviderToggle';
+import { SnippetsPanel } from '@/components/SnippetsPanel';
 import {
     type AiUsage,
     type ProfilePayload,
@@ -54,6 +55,8 @@ export default function SettingsPage() {
             {usage.data && <SpendIndicator usage={usage.data} />}
 
             <SettingsForm data={data} />
+
+            <SnippetsPanel />
         </div>
     );
 }
