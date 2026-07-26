@@ -7,6 +7,7 @@ use App\Http\Requests\Profile\ExtractVoiceRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
 use App\Http\Requests\Profile\UploadResumeRequest;
 use App\Jobs\ExtractVoiceProfileJob;
+use App\Jobs\RescoreUserProfileJob;
 use App\Models\Profile;
 use App\Models\User;
 use App\Services\Ai\AiKeyService;
@@ -24,6 +25,19 @@ use Illuminate\Validation\Rule;
  */
 class ProfileController extends Controller
 {
+    /**
+     * Profile fields that feed match scoring (see MatchJobToProfileJob::inputHash).
+     * Changing any of them invalidates the user's cached scores. resume_text is
+     * handled separately in uploadResume().
+     */
+    private const MATCH_RELEVANT_FIELDS = [
+        'headline',
+        'summary',
+        'target_roles',
+        'target_locations',
+        'target_comp_min_cents',
+    ];
+
     public function __construct(private readonly AiKeyService $keys) {}
 
     public function show(Request $request): JsonResponse
@@ -51,6 +65,13 @@ class ProfileController extends Controller
         $profile = $this->profileFor($request->user());
         $profile->fill($request->validated())->save();
 
+        // A change to any matching-relevant field invalidates the user's cached
+        // scores (they're fingerprinted by profile_version), so re-score their
+        // tracked postings. Skip no-op saves to avoid needless BYOK spend.
+        if ($profile->wasChanged(self::MATCH_RELEVANT_FIELDS)) {
+            RescoreUserProfileJob::dispatch($request->user()->id);
+        }
+
         return response()->json($this->payload($request->user()->refresh()));
     }
 
@@ -71,6 +92,11 @@ class ProfileController extends Controller
 
         $profile = $this->profileFor($request->user());
         $profile->forceFill(['resume_text' => $text])->save();
+
+        // The resume is a matching input, so a new one invalidates cached scores.
+        if ($profile->wasChanged('resume_text')) {
+            RescoreUserProfileJob::dispatch($request->user()->id);
+        }
 
         return response()->json($this->payload($request->user()->refresh()));
     }

@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { ExternalLink, MapPin, TriangleAlert } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { matchBand, matchBandLabel } from '@/components/MatchScoreBadge';
 import { useApplications, useCreateApplication } from '@/hooks/useApplications';
+import { useEnrichJob, useRescoreJob } from '@/hooks/useJobActions';
 import { formatDate, formatSalary, formatSalaryBand } from '@/lib/jobFormat';
 import { cn } from '@/lib/utils';
 import type { JobPosting, RemoteType } from '@/types/jobs';
@@ -73,7 +75,10 @@ export function JobDetailDialog({ job, open, onOpenChange }: JobDetailDialogProp
 
                 {/* Match section */}
                 <section className="space-y-3 rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold">Your match</h3>
+                    <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-semibold">Your match</h3>
+                        <ScoreAction job={job} scored={!!match && match.score != null} />
+                    </div>
                     {!match || match.score == null ? (
                         <p className="text-sm text-muted-foreground">This job hasn&apos;t been scored for you yet.</p>
                     ) : (
@@ -124,10 +129,15 @@ export function JobDetailDialog({ job, open, onOpenChange }: JobDetailDialogProp
                 </section>
 
                 {/* Enrichment section */}
-                {!enrichment ? (
-                    <p className="text-sm text-muted-foreground">Enrichment pending.</p>
-                ) : (
-                    <section className="space-y-3">
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-semibold">Enrichment</h3>
+                        <EnrichAction job={job} enriched={!!enrichment} />
+                    </div>
+                    {!enrichment ? (
+                        <p className="text-sm text-muted-foreground">Enrichment pending.</p>
+                    ) : (
+                        <section className="space-y-3">
                         {enrichmentSalary && (
                             <p className="text-sm">
                                 <span className="text-muted-foreground">Estimated salary: </span>
@@ -176,8 +186,9 @@ export function JobDetailDialog({ job, open, onOpenChange }: JobDetailDialogProp
                                 </div>
                             </div>
                         )}
-                    </section>
-                )}
+                        </section>
+                    )}
+                </div>
 
                 {job.jd_text && (
                     <section className="space-y-1.5">
@@ -240,5 +251,54 @@ function TrackJobAction({ job, onOpenChange }: { job: JobPosting; onOpenChange: 
         <Button variant="secondary" onClick={track} disabled={create.isPending}>
             {create.isPending ? 'Adding…' : 'Track this job'}
         </Button>
+    );
+}
+
+function actionError(error: unknown): string {
+    if (isAxiosError(error)) {
+        return (error.response?.data as { message?: string } | undefined)?.message ?? 'Something went wrong.';
+    }
+    return 'Something went wrong.';
+}
+
+/**
+ * Trigger a fresh match score for the current user (T-32). Scoring runs in the
+ * background, so success only means "started" — the score lands on a later fetch.
+ */
+function ScoreAction({ job, scored }: { job: JobPosting; scored: boolean }) {
+    const rescore = useRescoreJob();
+    const label = rescore.isPending ? 'Scoring…' : scored ? 'Re-score' : 'Score this job';
+
+    return (
+        <div className="flex flex-col items-end gap-1">
+            <Button variant="outline" size="sm" onClick={() => rescore.mutate(job.id)} disabled={rescore.isPending}>
+                {label}
+            </Button>
+            {rescore.isSuccess && (
+                <span className="text-xs text-muted-foreground">Scoring started — refresh in a moment.</span>
+            )}
+            {rescore.isError && <span className="text-xs text-rose-600 dark:text-rose-400">{actionError(rescore.error)}</span>}
+        </div>
+    );
+}
+
+/**
+ * Re-run the shared AI enrichment for this posting (T-31), funded by the
+ * caller's key. Enrichment is cached for every user and fans out fresh scores.
+ */
+function EnrichAction({ job, enriched }: { job: JobPosting; enriched: boolean }) {
+    const enrich = useEnrichJob();
+    const label = enrich.isPending ? 'Enriching…' : enriched ? 'Re-enrich' : 'Enrich now';
+
+    return (
+        <div className="flex flex-col items-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => enrich.mutate(job.id)} disabled={enrich.isPending}>
+                {label}
+            </Button>
+            {enrich.isSuccess && (
+                <span className="text-xs text-muted-foreground">Enrichment started — refreshes the shared analysis.</span>
+            )}
+            {enrich.isError && <span className="text-xs text-rose-600 dark:text-rose-400">{actionError(enrich.error)}</span>}
+        </div>
     );
 }
