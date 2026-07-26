@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import ApplicationDetailPage from '@/pages/ApplicationDetailPage';
 import ApplicationsPage from '@/pages/ApplicationsPage';
+import CoverLetterPage from '@/pages/CoverLetterPage';
 import FollowUpsPage from '@/pages/FollowUpsPage';
 import HomePage from '@/pages/HomePage';
 import JobSourcesPage from '@/pages/JobSourcesPage';
@@ -91,6 +92,14 @@ export default function App() {
                 element={
                     <ProtectedRoute>
                         <ApplicationDetailPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/applications/:id/letter"
+                element={
+                    <ProtectedRoute>
+                        <CoverLetterPage />
                     </ProtectedRoute>
                 }
             />

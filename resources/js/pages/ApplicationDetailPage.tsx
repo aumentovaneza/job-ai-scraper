@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, FileText } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
 import { MatchScoreBadge } from '@/components/MatchScoreBadge';
@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAddContact, useAddNote, useApplication } from '@/hooks/useApplications';
+import { useCoverLetter } from '@/hooks/useCoverLetters';
 import { apiMessage } from '@/lib/apiError';
 import { formatSalary } from '@/lib/jobFormat';
+import { humanizeVariant } from '@/lib/markdown';
 import type { ApplicationEvent } from '@/types/applications';
 
 export default function ApplicationDetailPage() {
@@ -71,7 +73,7 @@ export default function ApplicationDetailPage() {
                                 <NotesCard applicationId={application.id} />
                                 <ContactsCard applicationId={application.id} contacts={application.contacts ?? []} />
                                 <FollowUpsCard followUps={application.follow_ups ?? []} />
-                                <CoverLetterCard />
+                                <CoverLetterCard applicationId={application.id} />
                             </div>
                         </div>
 
@@ -312,14 +314,35 @@ function FollowUpsCard({ followUps }: { followUps: { id: number; status: string;
     );
 }
 
-function CoverLetterCard() {
+function CoverLetterCard({ applicationId }: { applicationId: number }) {
+    const { data: coverLetter, isLoading } = useCoverLetter(applicationId);
+    const versions = coverLetter?.versions ?? [];
+    const activeVersion = versions.find((v) => v.id === coverLetter?.active_version_id) ?? null;
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="text-base">Cover letter</CardTitle>
             </CardHeader>
-            <CardContent>
-                <p className="text-sm text-muted-foreground">Tailored cover letters arrive in Phase 5.</p>
+            <CardContent className="space-y-3">
+                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                {!isLoading && versions.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                        No letter drafted yet. Generate three angled variants grounded in your resume and this
+                        job.
+                    </p>
+                )}
+                {!isLoading && versions.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                        {versions.length} draft{versions.length === 1 ? '' : 's'}
+                        {activeVersion && ` · active: ${humanizeVariant(activeVersion.variant_label)}`}
+                    </p>
+                )}
+                <Button size="sm" variant="outline" asChild>
+                    <Link to={`/applications/${applicationId}/letter`}>
+                        <FileText /> {versions.length === 0 ? 'Draft letter' : 'Open editor'}
+                    </Link>
+                </Button>
             </CardContent>
         </Card>
     );
