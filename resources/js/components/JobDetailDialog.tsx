@@ -1,8 +1,10 @@
 import { ExternalLink, MapPin, TriangleAlert } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { matchBand, matchBandLabel } from '@/components/MatchScoreBadge';
+import { useApplications, useCreateApplication } from '@/hooks/useApplications';
 import { formatDate, formatSalary, formatSalaryBand } from '@/lib/jobFormat';
 import { cn } from '@/lib/utils';
 import type { JobPosting, RemoteType } from '@/types/jobs';
@@ -186,16 +188,57 @@ export function JobDetailDialog({ job, open, onOpenChange }: JobDetailDialogProp
                     </section>
                 )}
 
-                {job.apply_url && (
-                    <div className="flex justify-end">
+                <div className="flex items-center justify-end gap-2">
+                    <TrackJobAction job={job} onOpenChange={onOpenChange} />
+                    {job.apply_url && (
                         <Button asChild>
                             <a href={job.apply_url} target="_blank" rel="noreferrer">
                                 Apply <ExternalLink />
                             </a>
                         </Button>
-                    </div>
-                )}
+                    )}
+                </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * Adds a job to the application pipeline (T-43). When the job is already
+ * tracked, links straight to its tracker card instead of creating a duplicate.
+ */
+function TrackJobAction({ job, onOpenChange }: { job: JobPosting; onOpenChange: (open: boolean) => void }) {
+    const navigate = useNavigate();
+    const { data: applications } = useApplications();
+    const create = useCreateApplication();
+
+    const existing = applications?.find((a) => a.job_posting_id === job.id);
+
+    if (existing) {
+        return (
+            <Button variant="secondary" asChild>
+                <Link to={`/applications/${existing.id}`} onClick={() => onOpenChange(false)}>
+                    In your pipeline
+                </Link>
+            </Button>
+        );
+    }
+
+    function track() {
+        create.mutate(
+            { job_posting_id: job.id },
+            {
+                onSuccess: (application) => {
+                    onOpenChange(false);
+                    navigate(`/applications/${application.id}`);
+                },
+            }
+        );
+    }
+
+    return (
+        <Button variant="secondary" onClick={track} disabled={create.isPending}>
+            {create.isPending ? 'Adding…' : 'Track this job'}
+        </Button>
     );
 }

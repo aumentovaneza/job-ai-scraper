@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 const links = [
     { to: '/', label: 'Home' },
     { to: '/jobs', label: 'Jobs' },
+    { to: '/applications', label: 'Pipeline' },
+    { to: '/follow-ups', label: 'Follow-ups' },
     { to: '/sources', label: 'Sources' },
     { to: '/settings', label: 'Settings' },
 ] as const;

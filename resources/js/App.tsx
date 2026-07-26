@@ -4,6 +4,9 @@ import { AdminRoute } from '@/components/AdminRoute';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
+import ApplicationDetailPage from '@/pages/ApplicationDetailPage';
+import ApplicationsPage from '@/pages/ApplicationsPage';
+import FollowUpsPage from '@/pages/FollowUpsPage';
 import HomePage from '@/pages/HomePage';
 import JobSourcesPage from '@/pages/JobSourcesPage';
 import JobsPage from '@/pages/JobsPage';
@@ -72,6 +75,30 @@ export default function App() {
                 element={
                     <ProtectedRoute>
                         <JobSourcesPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/applications"
+                element={
+                    <ProtectedRoute>
+                        <ApplicationsPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/applications/:id"
+                element={
+                    <ProtectedRoute>
+                        <ApplicationDetailPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/follow-ups"
+                element={
+                    <ProtectedRoute>
+                        <FollowUpsPage />
                     </ProtectedRoute>
                 }
             />

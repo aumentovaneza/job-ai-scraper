@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\DefaultStages;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -27,7 +28,7 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        User::updateOrCreate(
+        $owner = User::updateOrCreate(
             ['email' => strtolower($email)],
             [
                 'name' => env('OWNER_NAME', 'Owner'),
@@ -36,6 +37,10 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
+
+        // Seed the owner's default application pipeline (T-40). Idempotent, so
+        // re-running the seeder on deploy leaves an existing pipeline untouched.
+        DefaultStages::seedFor($owner);
 
         $this->command?->info("Owner account ensured for {$email}.");
     }
