@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\DraftFollowUpsCommand;
 use App\Console\Commands\ScrapeSourcesCommand;
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -22,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // whose per-source cron_schedule is due (T-26).
         $schedule->command(ScrapeSourcesCommand::class)
             ->everyMinute()
+            ->withoutOverlapping();
+
+        // Nightly: draft follow-up nudges for applications that have gone quiet
+        // (T-45). Runs once a day so a user gets at most one draft per stale app.
+        $schedule->command(DraftFollowUpsCommand::class)
+            ->dailyAt('07:00')
             ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {

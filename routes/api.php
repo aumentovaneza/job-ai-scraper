@@ -2,7 +2,10 @@
 
 use App\Http\Controllers\AiKeyController;
 use App\Http\Controllers\AiUsageController;
+use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\ApplicationStageController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\FollowUpController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\JobPostingController;
 use App\Http\Controllers\JobSourceController;
@@ -34,6 +37,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/job-sources/{jobSource}/test-scrape', [JobSourceController::class, 'testScrape']);
     Route::patch('/job-sources/{jobSource}', [JobSourceController::class, 'update']);
     Route::delete('/job-sources/{jobSource}', [JobSourceController::class, 'destroy']);
+
+    // Application pipeline stages: per-user CRUD + reorder (T-40). Ownership is
+    // enforced by the BelongsToUser scope + ApplicationStagePolicy.
+    Route::get('/application-stages', [ApplicationStageController::class, 'index']);
+    Route::post('/application-stages', [ApplicationStageController::class, 'store']);
+    Route::put('/application-stages/reorder', [ApplicationStageController::class, 'reorder']);
+    Route::patch('/application-stages/{applicationStage}', [ApplicationStageController::class, 'update']);
+    Route::delete('/application-stages/{applicationStage}', [ApplicationStageController::class, 'destroy']);
+
+    // Application tracker: event-sourced pipeline (T-41/T-42). Every write goes
+    // through ApplicationService, appending to application_events.
+    Route::get('/applications', [ApplicationController::class, 'index']);
+    Route::post('/applications', [ApplicationController::class, 'store']);
+    Route::get('/applications/{application}', [ApplicationController::class, 'show']);
+    Route::patch('/applications/{application}/move', [ApplicationController::class, 'move']);
+    Route::post('/applications/{application}/notes', [ApplicationController::class, 'storeNote']);
+    Route::post('/applications/{application}/contacts', [ApplicationController::class, 'storeContact']);
+
+    // Follow-up inbox: review AI-drafted nudges, mark sent/dismissed (T-45).
+    Route::get('/follow-ups', [FollowUpController::class, 'index']);
+    Route::patch('/follow-ups/{followUp}', [FollowUpController::class, 'update']);
 
     // BYOK: per-user AI key management for each provider (T-10).
     Route::get('/ai-key', [AiKeyController::class, 'show']);

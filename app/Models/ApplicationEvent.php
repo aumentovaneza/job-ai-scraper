@@ -15,6 +15,21 @@ class ApplicationEvent extends Model
 {
     use BelongsToUser;
 
+    /** Application first created from a job (carries the initial stage). */
+    public const TYPE_CREATED = 'created';
+
+    /** Moved between pipeline stages (carries from/to stage). */
+    public const TYPE_STAGE_CHANGED = 'stage_changed';
+
+    /** A free-text note the user logged (body in metadata). */
+    public const TYPE_NOTE = 'note';
+
+    /** A contact was attached (contact id/name in metadata). */
+    public const TYPE_CONTACT_ADDED = 'contact_added';
+
+    /** A follow-up was drafted by the system (T-45). */
+    public const TYPE_FOLLOW_UP_DRAFTED = 'follow_up_drafted';
+
     protected function casts(): array
     {
         return [

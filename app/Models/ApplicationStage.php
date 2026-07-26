@@ -4,13 +4,14 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToUser;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['user_id', 'name', 'position', 'is_terminal', 'is_success'])]
 class ApplicationStage extends Model
 {
-    use BelongsToUser;
+    use BelongsToUser, HasFactory;
 
     protected function casts(): array
     {

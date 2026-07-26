@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToUser;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class FollowUp extends Model
 {
-    use BelongsToUser;
+    use BelongsToUser, HasFactory;
+
+    /** Statuses that mean the follow-up is still awaiting the user's action. */
+    public const ACTIVE_STATUSES = ['pending', 'drafted'];
 
     protected function casts(): array
     {

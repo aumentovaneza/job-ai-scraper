@@ -6,6 +6,7 @@ use App\Http\Requests\AcceptInvitationRequest;
 use App\Http\Requests\StoreInvitationRequest;
 use App\Models\Invitation;
 use App\Models\User;
+use App\Support\DefaultStages;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +89,10 @@ class InvitationController extends Controller
             ]);
 
             $invitation->forceFill(['accepted_at' => now()])->save();
+
+            // Seed the default application pipeline so the tracker works from
+            // the first login (T-40).
+            DefaultStages::seedFor($user);
 
             return $user;
         });
