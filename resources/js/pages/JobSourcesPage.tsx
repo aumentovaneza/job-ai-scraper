@@ -1,14 +1,17 @@
 import { type Dispatch, type FormEvent, type SetStateAction, useState } from 'react';
 import { AxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Play, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Play, Plus, Rss, Trash2, X } from 'lucide-react';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -327,7 +330,7 @@ export default function JobSourcesPage() {
     const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [testError, setTestError] = useState<string | null>(null);
 
-    const { data, isLoading, isError } = useQuery({
+    const { data, isLoading, isError, refetch } = useQuery({
         queryKey: JOB_SOURCES_KEY,
         queryFn: async () => {
             const { data } = await api.get<Paginated<JobSource>>('/api/job-sources');
@@ -629,14 +632,28 @@ export default function JobSourcesPage() {
 
                 <Card>
                     <CardContent className="pt-6">
-                        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                        {isLoading && (
+                            <div className="space-y-2">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+                        )}
                         {isError && (
-                            <p className="text-sm text-destructive">Could not load job sources. Try refreshing.</p>
+                            <ErrorState message="Could not load job sources." onRetry={() => void refetch()} />
                         )}
                         {!isLoading && !isError && sources.length === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                                No job sources yet. Add an ATS feed, career page, or RSS feed to start scraping.
-                            </p>
+                            <EmptyState
+                                icon={Rss}
+                                title="No job sources yet"
+                                description="Add an ATS feed, career page, or RSS feed to start scraping."
+                                action={
+                                    <Button onClick={openCreateForm}>
+                                        <Plus /> Add source
+                                    </Button>
+                                }
+                            />
                         )}
                         {!isLoading && !isError && sources.length > 0 && (
                             <Table>

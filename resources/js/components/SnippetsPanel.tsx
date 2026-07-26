@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateSnippet, useDeleteSnippet, useSnippets, useUpdateSnippet } from '@/hooks/useSnippets';
 import { apiMessage } from '@/lib/apiError';
@@ -33,7 +34,12 @@ export function SnippetsPanel() {
                 while editing.
             </p>
 
-            {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {isLoading && (
+                <div className="space-y-2">
+                    <Skeleton className="h-14 w-full" />
+                    <Skeleton className="h-14 w-full" />
+                </div>
+            )}
             {isError && <p className="text-sm text-destructive">Could not load your snippets.</p>}
 
             {creating && <SnippetForm onDone={() => setCreating(false)} />}

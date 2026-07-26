@@ -1,6 +1,10 @@
+import { BarChart3 } from 'lucide-react';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { humanizeVariant, renderInlineHtml, splitParagraphs } from '@/lib/markdown';
 import type {
@@ -23,7 +27,7 @@ function pct(rate: number | null): string {
  * application tracker via GET /api/analytics.
  */
 export default function AnalyticsPage() {
-    const { data, isLoading, isError } = useAnalytics();
+    const { data, isLoading, isError, refetch } = useAnalytics();
     const overview = data?.data;
     const summary = data?.summary;
     const hasData = (overview?.totals.applied ?? 0) > 0;
@@ -39,20 +43,19 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+                {isLoading && <AnalyticsSkeleton />}
                 {isError && (
-                    <p className="text-sm text-destructive">Could not load your insights. Try refreshing.</p>
+                    <ErrorState message="Could not load your insights." onRetry={() => void refetch()} />
                 )}
 
                 {overview && !isLoading && !isError && (
                     <>
                         {!hasData && (
-                            <Card>
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    No applications yet. Once you start tracking applications, your response
-                                    rates, conversion, and weekly summary will appear here.
-                                </CardContent>
-                            </Card>
+                            <EmptyState
+                                icon={BarChart3}
+                                title="No insights yet"
+                                description="Once you start tracking applications, your response rates, conversion, and weekly summary will appear here."
+                            />
                         )}
 
                         {hasData && (
@@ -69,6 +72,27 @@ export default function AnalyticsPage() {
                         )}
                     </>
                 )}
+            </div>
+        </div>
+    );
+}
+
+/** Skeleton mirroring the narrative card, stat tiles, and breakdown grid so the layout doesn't jump on load. */
+function AnalyticsSkeleton() {
+    return (
+        <div className="space-y-6">
+            <Skeleton className="h-32 w-full" />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-40 w-full" />
             </div>
         </div>
     );

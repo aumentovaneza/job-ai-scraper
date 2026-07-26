@@ -2,8 +2,12 @@ import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MailPlus } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 
 interface Invitation {
@@ -25,7 +29,7 @@ export default function InvitationsPage() {
     const [email, setEmail] = useState('');
     const [formError, setFormError] = useState<string | null>(null);
 
-    const { data, isLoading } = useQuery({
+    const { data, isLoading, isError, refetch } = useQuery({
         queryKey: INVITATIONS_KEY,
         queryFn: async () => {
             const { data } = await api.get<{ invitations: Invitation[] }>('/api/invitations');
@@ -87,9 +91,22 @@ export default function InvitationsPage() {
             {formError && <p className="-mt-6 text-sm text-destructive">{formError}</p>}
 
             <div className="space-y-3">
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-                {data?.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No invitations yet.</p>
+                {isLoading && (
+                    <>
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                    </>
+                )}
+                {isError && (
+                    <ErrorState message="Could not load invitations." onRetry={() => void refetch()} />
+                )}
+                {!isLoading && !isError && data?.length === 0 && (
+                    <EmptyState
+                        icon={MailPlus}
+                        title="No invitations yet"
+                        description="Invite someone with the form above to get started."
+                    />
                 )}
                 {data?.map((invite) => {
                     const accepted = invite.accepted_at !== null;

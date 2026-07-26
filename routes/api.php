@@ -8,6 +8,7 @@ use App\Http\Controllers\ApplicationStageController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CoverLetterController;
 use App\Http\Controllers\CoverLetterExportController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\FollowUpController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\JobPostingController;
@@ -99,6 +100,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Account settings + live AI spend (T-15).
     Route::put('/settings', [SettingsController::class, 'update']);
     Route::get('/ai/usage', [AiUsageController::class, 'show']);
+
+    // Personal-backup data export: a full JSON dump of the account (T-75).
+    Route::get('/export', [DataExportController::class, 'export']);
 
     // Admin-only invite management (T-09).
     Route::middleware('admin')->group(function () {

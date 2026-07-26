@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
+import { ErrorState } from '@/components/ErrorState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +27,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useApplication } from '@/hooks/useApplications';
 import {
@@ -36,7 +39,7 @@ import {
     useUpdateVersionContent,
 } from '@/hooks/useCoverLetters';
 import { useSnippets } from '@/hooks/useSnippets';
-import { apiMessage } from '@/lib/apiError';
+import { friendlyApiMessage } from '@/lib/apiError';
 import { downloadFile } from '@/lib/download';
 import {
     copyPlainText,
@@ -137,10 +140,16 @@ export default function CoverLetterPage() {
                     </div>
                 )}
 
-                {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-                {isError && (
-                    <p className="text-sm text-destructive">Could not load this cover letter. Try refreshing.</p>
+                {isLoading && (
+                    <div className="grid gap-6 md:grid-cols-3">
+                        <div className="space-y-4 md:col-span-2">
+                            <Skeleton className="h-9 w-40" />
+                            <Skeleton className="h-72 w-full" />
+                        </div>
+                        <Skeleton className="h-40 w-full" />
+                    </div>
                 )}
+                {isError && <ErrorState message="Could not load this cover letter." />}
 
                 {!isLoading && !isError && (
                     <>
@@ -173,10 +182,16 @@ export default function CoverLetterPage() {
                             />
                         ) : (
                             !stillGenerating && (
-                                <p className="text-sm text-muted-foreground">
-                                    No letter drafted yet. Click "Draft letter" to generate variants grounded in
-                                    your resume and this job's scraped company context.
-                                </p>
+                                <EmptyState
+                                    icon={Sparkles}
+                                    title="No letter drafted yet"
+                                    description="Generate variants grounded in your resume and this job's scraped company context, then edit and export the one you like."
+                                    action={
+                                        <Button size="sm" onClick={() => setDialogOpen(true)}>
+                                            <Sparkles /> Draft letter
+                                        </Button>
+                                    }
+                                />
                             )
                         )}
                     </>
@@ -277,7 +292,7 @@ function DraftLetterDialog({
                     onOpenChange(false);
                     onGenerated(selectedVariants.length, result.nudge);
                 },
-                onError: (err) => setError(apiMessage(err, 'Could not start the draft. Try again.')),
+                onError: (err) => setError(friendlyApiMessage(err, 'Could not start the draft. Try again.')),
             }
         );
     }
@@ -452,7 +467,7 @@ function LetterEditor({
                     setRegenInstructions('');
                     if (result.nudge) onNudge(result.nudge);
                 },
-                onError: (err) => setRegenError(apiMessage(err, 'Could not regenerate this paragraph.')),
+                onError: (err) => setRegenError(friendlyApiMessage(err, 'Could not regenerate this paragraph.')),
             }
         );
     }

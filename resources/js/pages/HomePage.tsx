@@ -1,23 +1,26 @@
-import { Link } from 'react-router-dom';
 import {
-    BellRing,
+    ArrowRight,
+    BarChart3,
     Briefcase,
-    ChevronRight,
-    KanbanSquare,
-    LineChart,
-    type LucideIcon,
+    Inbox,
+    LayoutList,
     Rss,
     Settings,
+    type LucideProps,
 } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { Link } from 'react-router-dom';
 import { AppNav } from '@/components/AppNav';
+import { EmptyState } from '@/components/EmptyState';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAiUsage } from '@/hooks/useProfile';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useApplications } from '@/hooks/useApplications';
 import { useFollowUps } from '@/hooks/useFollowUps';
 import { useJobSourcesCount } from '@/hooks/useJobSourcesCount';
 import { useJobsCount } from '@/hooks/useJobsCount';
-import { useAiUsage } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/useAuthStore';
 
 /** Format cents as a dollar string, mirroring the Settings page. */
@@ -25,139 +28,189 @@ function dollars(cents: number): string {
     return `$${(cents / 100).toFixed(2)}`;
 }
 
-/** Format a 0–1 rate as a whole percentage, mirroring the Insights page. */
+/** Format a 0–1 rate as a whole percentage, or an em dash when there's no data. */
 function pct(rate: number | null | undefined): string {
     return rate == null ? '—' : `${Math.round(rate * 100)}%`;
 }
 
-interface StatCardProps {
+const QUICK_LINKS: {
     to: string;
-    icon: LucideIcon;
-    title: string;
+    label: string;
     description: string;
-    /** The headline number/string; omit for a navigation-only card. */
-    stat?: string | number;
-    statLabel?: string;
-    loading?: boolean;
-}
+    icon: ComponentType<LucideProps>;
+}[] = [
+    {
+        to: '/jobs',
+        label: 'Job feed',
+        description: 'Browse scraped jobs, see your match scores, and track the good ones.',
+        icon: Briefcase,
+    },
+    {
+        to: '/applications',
+        label: 'Pipeline',
+        description: 'Drag applications between stages and open any one for detail.',
+        icon: LayoutList,
+    },
+    {
+        to: '/insights',
+        label: 'Insights',
+        description: "What's working across your applications, with a weekly read.",
+        icon: BarChart3,
+    },
+    {
+        to: '/follow-ups',
+        label: 'Follow-ups',
+        description: 'Review AI-drafted nudges for applications that have gone quiet.',
+        icon: Inbox,
+    },
+    {
+        to: '/sources',
+        label: 'Job sources',
+        description: 'Manage the ATS feeds, career pages, and APIs the scraper pulls from.',
+        icon: Rss,
+    },
+    {
+        to: '/settings',
+        label: 'Settings',
+        description: 'Your Anthropic key, resume, targets, spend caps, and data export.',
+        icon: Settings,
+    },
+];
 
 /**
- * A single dashboard tile: a tinted icon, a live headline stat, and a link out
- * to the matching screen. Shows an em dash while its query is loading so a slow
- * (or failed) endpoint never blanks the whole page.
- */
-function StatCard({ to, icon: Icon, title, description, stat, statLabel, loading }: StatCardProps) {
-    return (
-        <Link to={to} className="group">
-            <Card className="h-full p-5 transition-colors hover:border-primary/40 hover:bg-accent">
-                <div className="flex items-start justify-between">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                        <Icon className="size-5" />
-                    </div>
-                    <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </div>
-                {stat !== undefined && (
-                    <div className="mt-4 flex items-baseline gap-2">
-                        <span className="text-2xl font-semibold tabular-nums">
-                            {loading ? <span className="text-muted-foreground/40">—</span> : stat}
-                        </span>
-                        {statLabel && <span className="text-sm text-muted-foreground">{statLabel}</span>}
-                    </div>
-                )}
-                <CardTitle className={stat === undefined ? 'mt-4 text-base' : 'mt-3 text-base'}>
-                    {title}
-                </CardTitle>
-                <CardDescription className="mt-1">{description}</CardDescription>
-            </Card>
-        </Link>
-    );
-}
-
-/**
- * Landing dashboard for the authenticated SPA shell: a live overview tile per
- * pipeline screen (job feed, pipeline, insights, follow-ups, sources, settings)
- * with real counts pulled from the existing API, each linking to its section.
+ * Dashboard for the authenticated SPA (T-70 polish). Opens with a headline
+ * stat row read live from the analytics endpoint, then quick-link cards into
+ * every major screen — each showing its own live count pulled from the API.
  */
 export default function HomePage() {
     const user = useAuthStore((s) => s.user);
+    const { data, isLoading } = useAnalytics();
+    const totals = data?.data.totals;
+    const hasData = (totals?.applied ?? 0) > 0;
 
     const jobs = useJobsCount();
     const applications = useApplications();
-    const analytics = useAnalytics();
     const followUps = useFollowUps();
     const sources = useJobSourcesCount();
     const usage = useAiUsage();
+
+    /** Per-section headline stat shown on each quick-link card, keyed by route. */
+    const cardStats: Record<string, { value: string | number; label: string; loading: boolean }> = {
+        '/jobs': { value: jobs.data ?? 0, label: 'jobs', loading: jobs.isLoading },
+        '/applications': {
+            value: applications.data?.length ?? 0,
+            label: 'in pipeline',
+            loading: applications.isLoading,
+        },
+        '/insights': { value: pct(totals?.response_rate), label: 'response rate', loading: isLoading },
+        '/follow-ups': {
+            value: followUps.data?.length ?? 0,
+            label: 'pending',
+            loading: followUps.isLoading,
+        },
+        '/sources': { value: sources.data ?? 0, label: 'sources', loading: sources.isLoading },
+        '/settings': {
+            value: usage.data ? dollars(usage.data.week.spent_cents) : '—',
+            label: 'AI spend this week',
+            loading: usage.isLoading,
+        },
+    };
 
     return (
         <div className="min-h-screen bg-background">
             <AppNav />
             <div className="mx-auto max-w-5xl space-y-8 p-8">
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-semibold tracking-tight">JobScope</h1>
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-semibold tracking-tight">
+                        {user?.name ? `Welcome back, ${user.name.split(' ')[0]}` : 'JobScope'}
+                    </h1>
                     <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-muted-foreground">Welcome back, {user?.name ?? 'there'}</p>
+                        <p className="text-sm text-muted-foreground">{user?.email}</p>
                         {user?.is_admin && <Badge variant="secondary">Admin</Badge>}
                     </div>
-                    {user?.email && <p className="text-sm text-muted-foreground/70">{user.email}</p>}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <StatCard
-                        to="/jobs"
+                {isLoading ? (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-20 w-full" />
+                        ))}
+                    </div>
+                ) : hasData ? (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <StatTile label="Applications" value={String(totals?.applied ?? 0)} />
+                        <StatTile label="In progress" value={String(totals?.in_progress ?? 0)} />
+                        <StatTile label="Response rate" value={pct(totals?.response_rate)} />
+                        <StatTile
+                            label="Offers"
+                            value={String(totals?.offers ?? 0)}
+                            hint={`${totals?.won ?? 0} won`}
+                        />
+                    </div>
+                ) : (
+                    <EmptyState
                         icon={Briefcase}
-                        title="Job feed"
-                        description="Browse jobs scraped from your sources, filter and search."
-                        stat={jobs.data ?? 0}
-                        statLabel="jobs"
-                        loading={jobs.isLoading}
+                        title="No applications yet"
+                        description="Browse the job feed and track a role to start building your pipeline — your stats will show up here."
+                        action={
+                            <Link
+                                to="/jobs"
+                                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                            >
+                                Browse jobs <ArrowRight className="size-4" />
+                            </Link>
+                        }
                     />
-                    <StatCard
-                        to="/applications"
-                        icon={KanbanSquare}
-                        title="Pipeline"
-                        description="Track applications through every stage of your search."
-                        stat={applications.data?.length ?? 0}
-                        statLabel="in pipeline"
-                        loading={applications.isLoading}
-                    />
-                    <StatCard
-                        to="/insights"
-                        icon={LineChart}
-                        title="Insights"
-                        description="Conversion analytics and your weekly narrative."
-                        stat={pct(analytics.data?.data.totals.response_rate)}
-                        statLabel="response rate"
-                        loading={analytics.isLoading}
-                    />
-                    <StatCard
-                        to="/follow-ups"
-                        icon={BellRing}
-                        title="Follow-ups"
-                        description="Drafted and pending nudges awaiting your review."
-                        stat={followUps.data?.length ?? 0}
-                        statLabel="pending"
-                        loading={followUps.isLoading}
-                    />
-                    <StatCard
-                        to="/sources"
-                        icon={Rss}
-                        title="Job sources"
-                        description="Manage ATS feeds, career pages, and RSS feeds the scraper pulls from."
-                        stat={sources.data ?? 0}
-                        statLabel="sources"
-                        loading={sources.isLoading}
-                    />
-                    <StatCard
-                        to="/settings"
-                        icon={Settings}
-                        title="Settings"
-                        description="Manage your Anthropic key, resume, targets, and AI spend caps."
-                        stat={usage.data ? dollars(usage.data.week.spent_cents) : undefined}
-                        statLabel="AI spend this week"
-                        loading={usage.isLoading}
-                    />
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {QUICK_LINKS.map(({ to, label, description, icon: Icon }) => {
+                        const stat = cardStats[to];
+                        return (
+                            <Link key={to} to={to} className="group">
+                                <Card className="h-full transition-colors group-hover:bg-accent">
+                                    <CardHeader>
+                                        <div className="mb-1 flex size-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                            <Icon className="size-5" />
+                                        </div>
+                                        <CardTitle className="flex items-center justify-between">
+                                            {label}
+                                            <ArrowRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                        </CardTitle>
+                                        {stat && (
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className="text-xl font-semibold tabular-nums">
+                                                    {stat.loading ? (
+                                                        <span className="text-muted-foreground/40">—</span>
+                                                    ) : (
+                                                        stat.value
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {stat.label}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <CardDescription>{description}</CardDescription>
+                                    </CardHeader>
+                                </Card>
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
         </div>
+    );
+}
+
+function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+    return (
+        <Card>
+            <CardContent className="p-4">
+                <div className="text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
+                <div className="mt-1 text-xs font-medium text-muted-foreground">{label}</div>
+                {hint && <div className="mt-0.5 text-xs text-muted-foreground/70">{hint}</div>}
+            </CardContent>
+        </Card>
     );
 }
