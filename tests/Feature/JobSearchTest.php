@@ -125,3 +125,92 @@ it('returns a null match score for a posting the user has not been scored on', f
 
     expect($response->json('data.0.match_score'))->toBeNull();
 });
+
+/**
+ * Create a MatchScore for the given user/posting without tripping the
+ * BelongsToUser global scope (which would block cross-user seeding).
+ */
+function seedScore(User $user, JobPosting $posting, ?int $score): void
+{
+    MatchScore::withoutGlobalScopes()->create([
+        'user_id' => $user->id, 'job_posting_id' => $posting->id,
+        'score' => $score, 'reasoning' => 'r', 'strengths' => [], 'gaps' => [],
+        'prompt_version' => 'match_score.v1', 'input_hash' => uniqid(), 'computed_at' => now(),
+    ]);
+}
+
+it('filters to jobs the user has scored', function () {
+    $me = User::factory()->create();
+    $scored = JobPosting::factory()->create();
+    JobPosting::factory()->create(); // never scored
+
+    seedScore($me, $scored, 70);
+
+    actingAs($me);
+    $response = statefulGetJson('/api/jobs?score_status=scored')->assertOk();
+
+    expect($response->json('total'))->toBe(1);
+    expect($response->json('data.0.id'))->toBe($scored->id);
+});
+
+it('filters to jobs the user has not yet scored', function () {
+    $me = User::factory()->create();
+    $scored = JobPosting::factory()->create();
+    $unscored = JobPosting::factory()->create();
+    $nullScored = JobPosting::factory()->create();
+
+    seedScore($me, $scored, 70);
+    seedScore($me, $nullScored, null); // a row exists but score is null → still "unscored"
+
+    actingAs($me);
+    $response = statefulGetJson('/api/jobs?score_status=unscored')->assertOk();
+
+    $ids = collect($response->json('data'))->pluck('id')->all();
+    expect($response->json('total'))->toBe(2);
+    expect($ids)->toContain($unscored->id)->toContain($nullScored->id)->not->toContain($scored->id);
+});
+
+it('treats another user\'s score as unscored for me', function () {
+    $me = User::factory()->create();
+    $other = User::factory()->create();
+    $posting = JobPosting::factory()->create();
+
+    seedScore($other, $posting, 90);
+
+    actingAs($me);
+    // Only the other user scored it, so for me it is unscored.
+    expect(statefulGetJson('/api/jobs?score_status=scored')->assertOk()->json('total'))->toBe(0);
+    expect(statefulGetJson('/api/jobs?score_status=unscored')->assertOk()->json('total'))->toBe(1);
+});
+
+it('filters by a min/max score range', function () {
+    $me = User::factory()->create();
+    $low = JobPosting::factory()->create();
+    $mid = JobPosting::factory()->create();
+    $high = JobPosting::factory()->create();
+
+    seedScore($me, $low, 20);
+    seedScore($me, $mid, 60);
+    seedScore($me, $high, 95);
+
+    actingAs($me);
+
+    expect(statefulGetJson('/api/jobs?score_min=50')->assertOk()->json('total'))->toBe(2);
+    expect(statefulGetJson('/api/jobs?score_max=50')->assertOk()->json('total'))->toBe(1);
+
+    $range = statefulGetJson('/api/jobs?score_min=50&score_max=80')->assertOk();
+    expect($range->json('total'))->toBe(1);
+    expect($range->json('data.0.id'))->toBe($mid->id);
+});
+
+it('excludes unscored jobs when a score range is given', function () {
+    $me = User::factory()->create();
+    $scored = JobPosting::factory()->create();
+    JobPosting::factory()->create(); // unscored
+
+    seedScore($me, $scored, 40);
+
+    actingAs($me);
+    // A range implies "scored" — the unscored posting must not leak through.
+    expect(statefulGetJson('/api/jobs?score_min=0')->assertOk()->json('total'))->toBe(1);
+});

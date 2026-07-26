@@ -17,14 +17,27 @@ import type { JobPosting, Paginated, RemoteType } from '@/types/jobs';
 
 const PER_PAGE = 20;
 
+type ScoreStatus = 'scored' | 'unscored' | '';
+
 interface Filters {
     q: string;
     remoteType: RemoteType | '';
     salaryMin: string;
     postedAfter: string;
+    scoreStatus: ScoreStatus;
+    scoreMin: string;
+    scoreMax: string;
 }
 
-const EMPTY_FILTERS: Filters = { q: '', remoteType: '', salaryMin: '', postedAfter: '' };
+const EMPTY_FILTERS: Filters = {
+    q: '',
+    remoteType: '',
+    salaryMin: '',
+    postedAfter: '',
+    scoreStatus: '',
+    scoreMin: '',
+    scoreMax: '',
+};
 
 const REMOTE_BADGE_VARIANT: Record<RemoteType, 'default' | 'secondary' | 'outline'> = {
     remote: 'default',
@@ -46,6 +59,9 @@ export default function JobsPage() {
             if (appliedFilters.remoteType) params.remote_type = appliedFilters.remoteType;
             if (appliedFilters.salaryMin) params.salary_min = appliedFilters.salaryMin;
             if (appliedFilters.postedAfter) params.posted_after = appliedFilters.postedAfter;
+            if (appliedFilters.scoreStatus) params.score_status = appliedFilters.scoreStatus;
+            if (appliedFilters.scoreMin) params.score_min = appliedFilters.scoreMin;
+            if (appliedFilters.scoreMax) params.score_max = appliedFilters.scoreMax;
             const { data } = await api.get<Paginated<JobPosting>>('/api/jobs', { params });
             return data;
         },
@@ -71,7 +87,10 @@ export default function JobsPage() {
         appliedFilters.q !== '' ||
         appliedFilters.remoteType !== '' ||
         appliedFilters.salaryMin !== '' ||
-        appliedFilters.postedAfter !== '';
+        appliedFilters.postedAfter !== '' ||
+        appliedFilters.scoreStatus !== '' ||
+        appliedFilters.scoreMin !== '' ||
+        appliedFilters.scoreMax !== '';
 
     return (
         <div className="min-h-screen bg-background">
@@ -129,6 +148,46 @@ export default function JobsPage() {
                                     type="date"
                                     value={filters.postedAfter}
                                     onChange={(e) => setFilters((f) => ({ ...f, postedAfter: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="score_status">Match score</Label>
+                                <Select
+                                    id="score_status"
+                                    value={filters.scoreStatus}
+                                    onChange={(e) =>
+                                        setFilters((f) => ({ ...f, scoreStatus: e.target.value as ScoreStatus }))
+                                    }
+                                >
+                                    <option value="">Any</option>
+                                    <option value="scored">Scored</option>
+                                    <option value="unscored">Not scored</option>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="score_min">Min score</Label>
+                                <Input
+                                    id="score_min"
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={filters.scoreMin}
+                                    disabled={filters.scoreStatus === 'unscored'}
+                                    onChange={(e) => setFilters((f) => ({ ...f, scoreMin: e.target.value }))}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="score_max">Max score</Label>
+                                <Input
+                                    id="score_max"
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={filters.scoreMax}
+                                    disabled={filters.scoreStatus === 'unscored'}
+                                    onChange={(e) => setFilters((f) => ({ ...f, scoreMax: e.target.value }))}
+                                    placeholder="100"
                                 />
                             </div>
                             <div className="flex items-end gap-2 lg:col-span-4">
