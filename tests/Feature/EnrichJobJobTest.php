@@ -3,13 +3,17 @@
 namespace Tests\Feature;
 
 use App\Jobs\EnrichJobJob;
+use App\Jobs\MatchJobToProfileJob;
 use App\Models\JobPosting;
+use App\Models\JobSource;
+use App\Models\JobSourceHit;
 use App\Models\User;
 use App\Services\Ai\AiClientFactory;
 use App\Services\Ai\AiKeyService;
 use App\Services\Ai\AiProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class EnrichJobJobTest extends TestCase
@@ -68,6 +72,44 @@ class EnrichJobJobTest extends TestCase
             'reference_id' => $posting->id,
             'status' => 'ok',
         ]);
+    }
+
+    public function test_fans_out_match_scoring_to_each_tracking_user(): void
+    {
+        Queue::fake();
+
+        $enrichment = [
+            'seniority' => 'senior',
+            'one_line_summary' => 'A role.',
+        ];
+        $this->fakeEnrichment($enrichment);
+
+        $funder = $this->userWithKey();
+        $otherUser = User::factory()->create();
+
+        $posting = JobPosting::factory()->create(['jd_text' => 'A senior role.', 'enrichment' => null]);
+
+        // Two users each track this posting through their own source.
+        foreach ([$funder, $otherUser] as $u) {
+            $source = JobSource::factory()->create(['user_id' => $u->id]);
+            JobSourceHit::create([
+                'job_posting_id' => $posting->id,
+                'job_source_id' => $source->id,
+                'source_url' => 'https://example.test/job',
+                'first_seen_at' => now(),
+            ]);
+        }
+
+        (new EnrichJobJob($posting->id, $funder->id))->handle(app(AiClientFactory::class));
+
+        // One scoring job per distinct tracking user.
+        Queue::assertPushed(MatchJobToProfileJob::class, 2);
+        Queue::assertPushed(
+            fn (MatchJobToProfileJob $job) => $job->userId === $funder->id && $job->jobPostingId === $posting->id
+        );
+        Queue::assertPushed(
+            fn (MatchJobToProfileJob $job) => $job->userId === $otherUser->id
+        );
     }
 
     public function test_no_op_without_jd_text(): void

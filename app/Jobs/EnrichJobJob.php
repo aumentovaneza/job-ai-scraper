@@ -10,6 +10,7 @@ use App\Services\Ai\AiClientFactory;
 use App\Services\Ai\Prompt;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -104,6 +105,27 @@ class EnrichJobJob implements ShouldQueue
         $enrichment['generated_at'] = now()->toIso8601String();
 
         $posting->forceFill(['enrichment' => $enrichment])->save();
+
+        $this->dispatchMatching($posting);
+    }
+
+    /**
+     * Score the freshly-enriched posting for every user who tracks it — one
+     * MatchJobToProfileJob per distinct owner of a source that surfaced it (T-32).
+     * Runs on the raw tables because JobSource carries a BelongsToUser scope that
+     * would filter to nothing in this unauthenticated worker context.
+     */
+    private function dispatchMatching(JobPosting $posting): void
+    {
+        $userIds = DB::table('job_source_hits')
+            ->join('job_sources', 'job_sources.id', '=', 'job_source_hits.job_source_id')
+            ->where('job_source_hits.job_posting_id', $posting->id)
+            ->distinct()
+            ->pluck('job_sources.user_id');
+
+        foreach ($userIds as $userId) {
+            MatchJobToProfileJob::dispatch((int) $userId, $posting->id);
+        }
     }
 
     /**

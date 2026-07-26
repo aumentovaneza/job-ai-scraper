@@ -2,6 +2,8 @@ import { type FormEvent, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, ExternalLink, MapPin } from 'lucide-react';
 import { AppNav } from '@/components/AppNav';
+import { JobDetailDialog } from '@/components/JobDetailDialog';
+import { MatchScoreBadge } from '@/components/MatchScoreBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { api } from '@/lib/api';
+import { formatDate, formatSalary } from '@/lib/jobFormat';
+import { cn } from '@/lib/utils';
 import type { JobPosting, Paginated, RemoteType } from '@/types/jobs';
 
 const PER_PAGE = 20;
@@ -28,26 +32,11 @@ const REMOTE_BADGE_VARIANT: Record<RemoteType, 'default' | 'secondary' | 'outlin
     onsite: 'outline',
 };
 
-function formatSalary(job: JobPosting): string | null {
-    if (job.salary_min == null && job.salary_max == null) return null;
-    const currency = job.salary_currency ? `${job.salary_currency} ` : '';
-    const fmt = (n: number) => n.toLocaleString();
-    if (job.salary_min != null && job.salary_max != null) {
-        return `${currency}${fmt(job.salary_min)}–${fmt(job.salary_max)}`;
-    }
-    const only = job.salary_min ?? job.salary_max;
-    return only != null ? `${currency}${fmt(only)}+` : null;
-}
-
-function formatDate(iso: string | null): string | null {
-    if (!iso) return null;
-    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
 export default function JobsPage() {
     const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
     const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
     const [page, setPage] = useState(1);
+    const [selectedJob, setSelectedJob] = useState<JobPosting | null>(null);
 
     const { data, isLoading, isError, isFetching } = useQuery({
         queryKey: ['jobs', appliedFilters, page],
@@ -174,7 +163,14 @@ export default function JobsPage() {
                             const posted = formatDate(job.posted_at);
 
                             return (
-                                <Card key={job.id} className={isFetching ? 'opacity-60' : undefined}>
+                                <Card
+                                    key={job.id}
+                                    className={cn(
+                                        'cursor-pointer transition-colors hover:bg-accent/40',
+                                        isFetching && 'opacity-60'
+                                    )}
+                                    onClick={() => setSelectedJob(job)}
+                                >
                                     <CardContent className="flex items-start justify-between gap-4 pt-6">
                                         <div className="min-w-0 space-y-1.5">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -184,6 +180,7 @@ export default function JobsPage() {
                                                         {job.remote_type}
                                                     </Badge>
                                                 )}
+                                                <MatchScoreBadge matchScore={job.match_score} />
                                             </div>
                                             <p className="text-sm text-muted-foreground">{job.company}</p>
                                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -198,7 +195,7 @@ export default function JobsPage() {
                                             </div>
                                         </div>
                                         {job.apply_url && (
-                                            <Button variant="outline" size="sm" asChild>
+                                            <Button variant="outline" size="sm" asChild onClick={(e) => e.stopPropagation()}>
                                                 <a href={job.apply_url} target="_blank" rel="noreferrer">
                                                     Apply <ExternalLink />
                                                 </a>
@@ -236,6 +233,8 @@ export default function JobsPage() {
                     </div>
                 )}
             </div>
+
+            <JobDetailDialog job={selectedJob} open={selectedJob != null} onOpenChange={(open) => !open && setSelectedJob(null)} />
         </div>
     );
 }
