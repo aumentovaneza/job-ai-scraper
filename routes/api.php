@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AiKeyController;
 use App\Http\Controllers\AiUsageController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\ApplicationStageController;
 use App\Http\Controllers\Auth\AuthController;
@@ -57,6 +58,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/applications/{application}/move', [ApplicationController::class, 'move']);
     Route::post('/applications/{application}/notes', [ApplicationController::class, 'storeNote']);
     Route::post('/applications/{application}/contacts', [ApplicationController::class, 'storeContact']);
+
+    // Insights dashboard: conversion analytics + weekly Claude narrative (T-60/T-61).
+    Route::get('/analytics', [AnalyticsController::class, 'show']);
 
     // Follow-up inbox: review AI-drafted nudges, mark sent/dismissed (T-45).
     Route::get('/follow-ups', [FollowUpController::class, 'index']);

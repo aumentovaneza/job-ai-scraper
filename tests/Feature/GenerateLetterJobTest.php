@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Ai\AiClientFactory;
 use App\Services\Ai\AiKeyService;
 use App\Services\Ai\AiProvider;
+use App\Services\AnalyticsService;
 use App\Services\ApplicationService;
 use App\Services\CompanyContextService;
 use App\Support\DefaultStages;
@@ -59,6 +60,7 @@ function runLetterJob(int $coverLetterId, array $params = []): void
     (new GenerateLetterJob($coverLetterId, $params))->handle(
         app(AiClientFactory::class),
         app(CompanyContextService::class),
+        app(AnalyticsService::class),
     );
 }
 
@@ -86,7 +88,7 @@ it('creates one version per variant, sets the first active, and logs ai_calls', 
 
     // generation_params captures everything needed to reproduce the draft.
     $params = $versions->first()->generation_params;
-    expect($params['prompt_version'])->toBe('letter_story_led.v1');
+    expect($params['prompt_version'])->toBe('letter_story_led.v2');
     expect($params['length_hint'])->toBe('medium');
     expect($params)->toHaveKey('company_context_used');
 
@@ -94,7 +96,7 @@ it('creates one version per variant, sets the first active, and logs ai_calls', 
     expect($coverLetter->active_version_id)->toBe($versions->first()->id);
 
     expect(AiCall::withoutGlobalScopes()->where('purpose', 'letter')->count())->toBe(3);
-    expect(AiCall::withoutGlobalScopes()->where('purpose', 'letter')->where('prompt_version', 'letter_story_led.v1')->exists())->toBeTrue();
+    expect(AiCall::withoutGlobalScopes()->where('purpose', 'letter')->where('prompt_version', 'letter_story_led.v2')->exists())->toBeTrue();
 });
 
 it('honors an explicit variants list', function () {

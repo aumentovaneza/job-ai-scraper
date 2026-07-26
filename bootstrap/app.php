@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\DraftFollowUpsCommand;
+use App\Console\Commands\InsightsDigestCommand;
 use App\Console\Commands\ScrapeSourcesCommand;
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -29,6 +30,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // (T-45). Runs once a day so a user gets at most one draft per stale app.
         $schedule->command(DraftFollowUpsCommand::class)
             ->dailyAt('07:00')
+            ->withoutOverlapping();
+
+        // Weekly: build each user's insights digest — analytics + a Claude-written
+        // narrative — and email it (Phase 6, T-61/T-63). Monday morning so it
+        // frames the week ahead.
+        $schedule->command(InsightsDigestCommand::class)
+            ->weeklyOn(1, '08:00')
             ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
