@@ -4,6 +4,7 @@ import { AdminRoute } from '@/components/AdminRoute';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
+import AnalyticsPage from '@/pages/AnalyticsPage';
 import ApplicationDetailPage from '@/pages/ApplicationDetailPage';
 import ApplicationsPage from '@/pages/ApplicationsPage';
 import CoverLetterPage from '@/pages/CoverLetterPage';
@@ -108,6 +109,14 @@ export default function App() {
                 element={
                     <ProtectedRoute>
                         <FollowUpsPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/insights"
+                element={
+                    <ProtectedRoute>
+                        <AnalyticsPage />
                     </ProtectedRoute>
                 }
             />

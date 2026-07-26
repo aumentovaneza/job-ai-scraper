@@ -12,6 +12,7 @@ use App\Models\Profile;
 use App\Models\User;
 use App\Services\Ai\AiClientFactory;
 use App\Services\Ai\Prompt;
+use App\Services\AnalyticsService;
 use App\Services\CompanyContextService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -49,8 +50,11 @@ class GenerateLetterJob implements ShouldQueue
         $this->onQueue('ai');
     }
 
-    public function handle(AiClientFactory $factory, CompanyContextService $companyContext): void
-    {
+    public function handle(
+        AiClientFactory $factory,
+        CompanyContextService $companyContext,
+        AnalyticsService $analytics,
+    ): void {
         $coverLetter = CoverLetter::withoutGlobalScopes()->find($this->coverLetterId);
         if ($coverLetter === null) {
             return;
@@ -85,10 +89,18 @@ class GenerateLetterJob implements ShouldQueue
         $companyContextUsed = $facts !== null && trim($facts) !== '';
         $companyContextText = $companyContextUsed ? $facts : 'not provided';
 
+        // Feedback loop (T-62): distill priors from the user's own application
+        // history — the angle that converts best, the gaps recruiters keep
+        // flagging — into a short guidance preamble the letter prompt can lean on.
+        $priors = $analytics->priorsFor($user);
+        $userHistory = $priors !== null ? $analytics->priorsPreamble($priors) : '';
+        $userHistoryUsed = $userHistory !== '';
+        $userHistoryText = $userHistoryUsed ? $userHistory : 'none';
+
         $client = $factory->forUser($user);
 
         foreach ($variants as $variant) {
-            $promptVersion = "letter_{$variant}.v1";
+            $promptVersion = "letter_{$variant}.v2";
 
             if (! Prompt::exists($promptVersion)) {
                 Log::warning('Skipping unknown letter variant', [
@@ -106,6 +118,7 @@ class GenerateLetterJob implements ShouldQueue
                 'resume_text' => $profile?->resume_text ?: 'not provided',
                 'voice_profile' => $this->voiceProfileText($profile),
                 'company_context' => $companyContextText,
+                'user_history' => $userHistoryText,
                 'length_hint' => $lengthHint,
                 'tone' => $tone,
                 'custom_instructions' => $customInstructions,
@@ -159,6 +172,7 @@ class GenerateLetterJob implements ShouldQueue
                     'tone' => $tone,
                     'custom_instructions' => $customInstructions,
                     'company_context_used' => $companyContextUsed,
+                    'user_history_used' => $userHistoryUsed,
                     'model' => $response->model,
                 ],
             ]);
