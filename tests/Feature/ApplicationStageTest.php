@@ -49,6 +49,21 @@ it('does not re-seed stages for a user that already has them', function () {
         ->toBe(count(DefaultStages::STAGES));
 });
 
+it('seeds the default pipeline on first read for a logged-in user with no stages', function () {
+    // Account provisioned without stage seeding (created before the feature, or
+    // outside the invite/owner paths). Listing stages should self-heal.
+    $me = User::factory()->create();
+    expect(ApplicationStage::withoutGlobalScopes()->where('user_id', $me->id)->exists())->toBeFalse();
+
+    actingAs($me);
+    $response = stagesRequest()->getJson('/api/application-stages')->assertOk();
+
+    expect($response->json('data'))->toHaveCount(count(DefaultStages::STAGES));
+    expect($response->json('data.0.name'))->toBe('Saved');
+    expect(ApplicationStage::withoutGlobalScopes()->where('user_id', $me->id)->count())
+        ->toBe(count(DefaultStages::STAGES));
+});
+
 // --- CRUD -------------------------------------------------------------------
 
 it('requires authentication to list stages', function () {
