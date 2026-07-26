@@ -6,13 +6,16 @@ use App\Http\Requests\ReorderApplicationStagesRequest;
 use App\Http\Requests\StoreApplicationStageRequest;
 use App\Http\Requests\UpdateApplicationStageRequest;
 use App\Models\ApplicationStage;
+use App\Support\DefaultStages;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
- * CRUD + reordering for a user's pipeline stages (T-40). Every user gets the
- * default pipeline seeded at account creation (DefaultStages); this endpoint
- * lets them rename, add, remove, and reorder those stages.
+ * CRUD + reordering for a user's pipeline stages (T-40). The default pipeline is
+ * seeded at account creation (DefaultStages) and lazily on first read here, so
+ * every logged-in user always has a pipeline; this endpoint lets them rename,
+ * add, remove, and reorder those stages.
  *
  * All actions are user-scoped: the BelongsToUser global scope hides other users'
  * rows (route binding 404s on a foreign id) and ApplicationStagePolicy gates
@@ -20,9 +23,16 @@ use Illuminate\Support\Facades\DB;
  */
 class ApplicationStageController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', ApplicationStage::class);
+
+        // Guarantee every logged-in user has a pipeline: seed the defaults on
+        // first read for accounts that never got one (created before the stages
+        // feature, or outside the invite/owner seeding paths). Idempotent.
+        if (! ApplicationStage::query()->exists()) {
+            DefaultStages::seedFor($request->user());
+        }
 
         $stages = ApplicationStage::query()
             ->orderBy('position')

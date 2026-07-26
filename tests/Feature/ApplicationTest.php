@@ -99,6 +99,27 @@ it('lets two users independently track the same job', function () {
     expect(Application::withoutGlobalScopes()->where('job_posting_id', $job->id)->count())->toBe(2);
 });
 
+it('seeds the default pipeline on demand for a user with no stages', function () {
+    // Account provisioned without stage seeding (e.g. created before the stages
+    // feature). Tracking a job should self-heal rather than 500.
+    $me = User::factory()->create();
+    $job = JobPosting::factory()->create();
+    actingAs($me);
+
+    expect(ApplicationStage::withoutGlobalScopes()->where('user_id', $me->id)->exists())->toBeFalse();
+
+    $response = appRequest()->postJson('/api/applications', ['job_posting_id' => $job->id])
+        ->assertCreated();
+
+    $saved = ApplicationStage::withoutGlobalScopes()
+        ->where('user_id', $me->id)->orderBy('position')->first();
+
+    expect($saved->name)->toBe('Saved');
+    expect($response->json('data.current_stage_id'))->toBe($saved->id);
+    expect(ApplicationStage::withoutGlobalScopes()->where('user_id', $me->id)->count())
+        ->toBe(count(DefaultStages::STAGES));
+});
+
 // --- Index ------------------------------------------------------------------
 
 it('lists only the current user\'s applications', function () {

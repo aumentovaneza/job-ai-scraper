@@ -8,6 +8,7 @@ use App\Models\ApplicationStage;
 use App\Models\Contact;
 use App\Models\JobPosting;
 use App\Models\User;
+use App\Support\DefaultStages;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -32,11 +33,21 @@ class ApplicationService
      * (lowest position — the default "Saved") when none is supplied. Appends a
      * `created` event.
      *
-     * @throws RuntimeException when the user has no pipeline stages configured.
+     * Self-heals a user with no pipeline: default-stage seeding is normally done
+     * at account creation (invite-accept / owner seeder), but accounts provisioned
+     * some other way — or before the stages feature existed — can reach here with
+     * an empty pipeline. Seed the defaults on demand rather than 500-ing.
+     *
+     * @throws RuntimeException when the user still has no stages after seeding.
      */
     public function createFromJob(User $user, JobPosting $job, ?ApplicationStage $stage = null): Application
     {
         $stage ??= $this->firstStage($user->id);
+
+        if ($stage === null) {
+            DefaultStages::seedFor($user);
+            $stage = $this->firstStage($user->id);
+        }
 
         if ($stage === null) {
             throw new RuntimeException('User has no application stages configured.');
