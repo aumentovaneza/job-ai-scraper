@@ -39,6 +39,7 @@ class MatchJobToProfileJob implements ShouldQueue
     public function __construct(
         public readonly int $userId,
         public readonly int $jobPostingId,
+        public readonly bool $force = false,
     ) {
         $this->onQueue('ai');
     }
@@ -66,8 +67,9 @@ class MatchJobToProfileJob implements ShouldQueue
             ->where('job_posting_id', $posting->id)
             ->first();
 
-        // T-34: inputs unchanged since the last score — skip the Claude call.
-        if ($existing !== null && $existing->input_hash === $inputHash) {
+        // T-34: inputs unchanged since the last score — skip the Claude call
+        // (unless a manual re-run explicitly forces a fresh score).
+        if (! $this->force && $existing !== null && $existing->input_hash === $inputHash) {
             return;
         }
 

@@ -35,6 +35,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Job catalog feed: keyword search + filters (T-06).
     Route::get('/jobs', [JobPostingController::class, 'index']);
 
+    // On-demand AI triggers over the shared catalog. `rescore` writes only the
+    // caller's own MatchScore; `enrich` re-runs the shared enrichment funded by
+    // the caller. Both dispatch to the `ai` queue and return 202.
+    Route::post('/jobs/{jobPosting}/rescore', [JobPostingController::class, 'rescore']);
+    Route::post('/jobs/{jobPosting}/enrich', [JobPostingController::class, 'enrich']);
+
     // Job sources: per-user CRUD + synchronous test-scrape (T-21). Ownership is
     // enforced by the BelongsToUser scope + JobSourcePolicy.
     Route::get('/job-sources', [JobSourceController::class, 'index']);

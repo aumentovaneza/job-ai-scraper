@@ -40,6 +40,7 @@ class EnrichJobJob implements ShouldQueue
     public function __construct(
         public readonly int $jobPostingId,
         public readonly int $userId,
+        public readonly bool $force = false,
     ) {
         $this->onQueue('ai');
     }
@@ -52,8 +53,9 @@ class EnrichJobJob implements ShouldQueue
             return;
         }
 
-        // Already enriched with the current prompt version — don't re-spend.
-        if (($posting->enrichment['prompt_version'] ?? null) === self::PROMPT_VERSION) {
+        // Already enriched with the current prompt version — don't re-spend
+        // (unless a manual re-run explicitly forces a fresh enrichment).
+        if (! $this->force && ($posting->enrichment['prompt_version'] ?? null) === self::PROMPT_VERSION) {
             return;
         }
 
@@ -124,7 +126,9 @@ class EnrichJobJob implements ShouldQueue
             ->pluck('job_sources.user_id');
 
         foreach ($userIds as $userId) {
-            MatchJobToProfileJob::dispatch((int) $userId, $posting->id);
+            // A forced re-enrichment forces the follow-on re-score too, so the
+            // cached score doesn't shadow the fresh enrichment.
+            MatchJobToProfileJob::dispatch((int) $userId, $posting->id, $this->force);
         }
     }
 
