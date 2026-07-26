@@ -22,6 +22,9 @@ use Illuminate\Support\Facades\DB;
  *   - remote_type  string  remote | hybrid | onsite
  *   - salary_min   int     postings whose upper salary band is at least this
  *   - posted_after string  ISO date/datetime; postings posted on/after this
+ *   - score_status string  scored | unscored (per the current user's MatchScore)
+ *   - score_min    int     0-100; postings the user scored at least this (implies scored)
+ *   - score_max    int     0-100; postings the user scored at most this (implies scored)
  *
  * When a $user is supplied, results are additionally ordered so postings whose
  * only surfacing sources are low-acceptability (won't hire internationally /
@@ -60,6 +63,8 @@ class JobSearchService
             $query->where('posted_at', '>=', $filters['posted_after']);
         }
 
+        $this->applyScoreFilters($query, $filters);
+
         // Leading sort: source-level acceptability (acceptable buckets first),
         // then relevance / recency within each bucket.
         if ($user !== null) {
@@ -73,6 +78,43 @@ class JobSearchService
         }
 
         return $query;
+    }
+
+    /**
+     * Filter by the current user's match score. "Scored" means a MatchScore row
+     * exists for the user with a non-null score; "unscored" is the negation.
+     * A score_min/score_max range implies scored (a null score can't be in range).
+     * The `matchScore` relation carries the BelongsToUser global scope, so these
+     * predicates are automatically restricted to the authenticated user.
+     */
+    protected function applyScoreFilters(Builder $query, array $filters): void
+    {
+        $status = $filters['score_status'] ?? null;
+        $min = isset($filters['score_min']) ? (int) $filters['score_min'] : null;
+        $max = isset($filters['score_max']) ? (int) $filters['score_max'] : null;
+
+        if ($status === 'unscored') {
+            $query->whereDoesntHave('matchScore', function (Builder $q) {
+                $q->whereNotNull('score');
+            });
+
+            return;
+        }
+
+        // Any of scored / range implies the posting must have a non-null score.
+        if ($status === 'scored' || $min !== null || $max !== null) {
+            $query->whereHas('matchScore', function (Builder $q) use ($min, $max) {
+                $q->whereNotNull('score');
+
+                if ($min !== null) {
+                    $q->where('score', '>=', $min);
+                }
+
+                if ($max !== null) {
+                    $q->where('score', '<=', $max);
+                }
+            });
+        }
     }
 
     /**

@@ -20,6 +20,9 @@ class JobIndexRequest extends FormRequest
             'remote_type' => ['sometimes', 'string', 'in:remote,hybrid,onsite'],
             'salary_min' => ['sometimes', 'integer', 'min:0'],
             'posted_after' => ['sometimes', 'date'],
+            'score_status' => ['sometimes', 'string', 'in:scored,unscored'],
+            'score_min' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'score_max' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }
